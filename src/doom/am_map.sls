@@ -3,7 +3,7 @@
   (export am-responder am-ticker am-drawer am-stop
           AM_MSGHEADER AM_MSGENTERED AM_MSGEXITED)
   (import (chezscheme) (doom doomdef) (doom doomdata) (doom doomstat) (doom d_event)
-          (doom d_player) (doom p_mobj) (doom p_local) (doom r_defs) (doom r_state)
+          (doom d_player) (doom p_mobj.h) (doom p_local) (doom r_defs) (doom r_state)
           (doom m_fixed) (doom tables) (doom m_cheat) (doom v_video) (doom w_wad)
           (doom dstrings))
 

@@ -9,8 +9,13 @@
 ;;; parents' included, gets its default, like a zeroed C struct; default
 ;;; expressions are evaluated per instance) or one argument per field of NAME
 ;;; itself (parent fields still get their defaults).
+;;;
+;;; (struct-copy! dst src) copies every field of src into dst (both of the
+;;; same record type): C's `*dst = *src`, or with a fresh (make-name) as src,
+;;; `memset (dst, 0, sizeof *dst)`. Field values are shared, not copied, so
+;;; a field holding an array must be replaced, not mutated, afterwards.
 (library (doom struct)
-  (export define-struct)
+  (export define-struct struct-copy!)
   (import (chezscheme))
 
   (define-syntax define-struct
@@ -44,4 +49,12 @@
                 (lambda (n)
                   (case-lambda
                     [() ((n) default ...)]
-                    [(arg ...) ((n) arg ...)])))))]))))
+                    [(arg ...) ((n) arg ...)])))))])))
+
+  (define (struct-copy! dst src)
+    (let loop ([rtd (record-rtd src)])
+      (when rtd
+        (let ([n (vector-length (record-type-field-names rtd))])
+          (do ([i 0 (fx+ i 1)]) ((fx= i n))
+            ((record-mutator rtd i) dst ((record-accessor rtd i) src))))
+        (loop (record-type-parent rtd))))))

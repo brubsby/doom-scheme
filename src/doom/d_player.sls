@@ -1,7 +1,7 @@
 ;;; d_player: player_t, the player's game state beyond its mobj.
 (library (doom d_player)
   (export PST_LIVE PST_DEAD PST_REBORN CF_NOCLIP CF_GODMODE CF_NOMOMENTUM
-          ps_weapon ps_flash NUMPSPRITES
+          ps_weapon ps_flash NUMPSPRITES FF_FULLBRIGHT FF_FRAMEMASK
           pspdef make-pspdef pspdef? pspdef-state pspdef-state-set!
           pspdef-tics pspdef-tics-set! pspdef-sx pspdef-sx-set! pspdef-sy pspdef-sy-set!
           player make-player player?
@@ -35,6 +35,11 @@
   (define CF_NOCLIP 1)
   (define CF_GODMODE 2)
   (define CF_NOMOMENTUM 4)
+
+  ;; Frame flags (p_pspr.h): a state's or mobj's frame is a frame number,
+  ;; possibly ORed with FF_FULLBRIGHT.
+  (define FF_FULLBRIGHT #x8000)
+  (define FF_FRAMEMASK #x7fff)
 
   ;; psprnum_t (p_pspr.h)
   (define ps_weapon 0)

@@ -3,7 +3,7 @@
 ;;; them in the header's library keeps the import graph acyclic.
 ;;; Only what the ported modules use so far is here.
 (library (doom doomstat)
-  (export gamemode gamemission
+  (export gamemode gamemission modifiedgame
           nomonsters respawnparm fastparm devparm
           startskill startepisode startmap autostart
           gameskill gameepisode gamemap respawnmonsters netgame deathmatch
@@ -14,11 +14,13 @@
           gamestate gametic
           players playeringame
           MAX_DM_STARTS deathmatchstarts deathmatch_p playerstarts
-          precache bodyqueslot)
+          precache bodyqueslot maxammo)
   (import (chezscheme) (doom global) (doom doomdef) (doom doomdata) (doom d_player))
 
   (define-global gamemode indetermined)
   (define-global gamemission doom)
+  ;; Set if a PWAD was added (sprite lumps are then looked up by name).
+  (define-global modifiedgame #f)
 
   (define-global nomonsters #f)
   (define-global respawnparm #f)
@@ -70,4 +72,7 @@
   (define playerstarts (make-vector MAXPLAYERS #f))
 
   (define-global precache #t)
-  (define-global bodyqueslot 0))
+  (define-global bodyqueslot 0)
+
+  ;; Ammo limits without a backpack (defined in p_inter.c).
+  (define maxammo (fxvector 200 50 300 50)))

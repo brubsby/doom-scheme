@@ -17,6 +17,10 @@
 //                            "F:k,k,...;F:k,..." with decimal doom key codes
 //   ORACLE_LEVELDUMP=path    P_SetupLevel writes the loaded level's structures
 //                            here (see oracle_level_dump)
+//   ORACLE_CAMERAS=path      at the end of P_SetupLevel, render the level from
+//                            each camera in the file, dump each frame to
+//                            ORACLE_RAW_DIR/cNNNN.raw and exit (see
+//                            oracle_camera_probe)
 //
 // TRACE FORMAT (one line per tic, space separated, decimal):
 //   gametic gamestate leveltime prndindex rndindex
@@ -46,6 +50,7 @@
 #include "d_main.h"
 #include "w_wad.h"
 #include "doomdata.h"
+#include "r_main.h"
 #include <string.h>
 
 extern byte oracle_palette[768];
@@ -188,6 +193,56 @@ void oracle_level_dump (int episode, int map, int lumpnum)
     fprintf (f, "end\n");
     fclose (f);
 #undef IDX
+}
+
+// Render the freshly loaded level (things at their spawn states, no tics
+// run) from each camera line "x y angle blocks detail extralight
+// fixedcolormap": x, y in map units, angle a raw angle_t, the rest as in
+// R_SetViewSize and player_t. The camera stands on the floor at VIEWHEIGHT,
+// with no weapon. screens[0] is cleared to 0 before each frame. The
+// cameras run in file order, so state the renderer keeps between frames
+// (fuzzpos, stale visplane rows) carries over exactly as it would in the
+// port.
+void R_ExecuteSetViewSize (void);
+void oracle_camera_probe (void)
+{
+    char* path = getenv ("ORACLE_CAMERAS");
+    char* dir = getenv ("ORACLE_RAW_DIR");
+    static mobj_t mo;
+    static player_t pl;
+    FILE* f;
+    FILE* out;
+    char outpath[1024];
+    int x, y, blocks, detail, extralight, fixedcolormap, n = 0;
+    unsigned angle;
+    if (!path) return;
+    if (!dir) { fprintf (stderr, "ORACLE_CAMERAS needs ORACLE_RAW_DIR\n"); exit (2); }
+    f = fopen (path, "r");
+    if (!f) { fprintf (stderr, "can't open %s\n", path); exit (2); }
+    while (fscanf (f, "%d %d %u %d %d %d %d", &x, &y, &angle, &blocks, &detail,
+                   &extralight, &fixedcolormap) == 7)
+    {
+        memset (&mo, 0, sizeof mo);
+        memset (&pl, 0, sizeof pl);
+        mo.x = x << FRACBITS;
+        mo.y = y << FRACBITS;
+        mo.angle = angle;
+        mo.subsector = R_PointInSubsector (mo.x, mo.y);
+        pl.mo = &mo;
+        pl.viewz = mo.subsector->sector->floorheight + VIEWHEIGHT;
+        pl.extralight = extralight;
+        pl.fixedcolormap = fixedcolormap;
+        R_SetViewSize (blocks, detail);
+        R_ExecuteSetViewSize ();
+        memset (screens[0], 0, SCREENWIDTH*SCREENHEIGHT);
+        R_RenderPlayerView (&pl);
+        snprintf (outpath, sizeof outpath, "%s/c%04d.raw", dir, n++);
+        out = fopen (outpath, "wb");
+        fwrite (screens[0], 1, SCREENWIDTH*SCREENHEIGHT, out);
+        fclose (out);
+    }
+    fclose (f);
+    exit (0);
 }
 
 static void dump_ppm (void)

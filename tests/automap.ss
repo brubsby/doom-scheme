@@ -2,7 +2,7 @@
 ;;; (tools/oracle/levels.sh) opens the automap with the iddt cheat, zooms out
 ;;; to the whole map ('0') and turns on the grid ('g'), dumping screens[0]
 ;;; after each step. We replay the same keys and compare the automap area.
-(import (chezscheme) (doom w_wad) (doom r_data) (doom p_setup) (doom doomdef)
+(import (chezscheme) (doom w_wad) (doom r_data) (doom p_local) (doom doomdef)
         (doom doomstat) (doom d_event) (doom am_map) (doom v_video))
 (load "tests/lib.ss")
 

@@ -1,8 +1,8 @@
 ;;; p_setup against the oracle: every shareware map's structures, as left by
 ;;; P_GroupLines, must print exactly like build/oracle/levels/E1Mn/level.txt
 ;;; (tools/oracle/oracle.c, oracle_level_dump).
-(import (chezscheme) (doom w_wad) (doom r_data) (doom p_setup) (doom r_state)
-        (doom r_defs) (doom p_local) (doom doomdef) (doom doomstat) (doom trace))
+(import (chezscheme) (doom w_wad) (doom r_data) (doom p_local) (doom r_state)
+        (doom r_defs) (doom doomdef) (doom doomstat) (doom trace))
 (load "tests/lib.ss")
 
 (define (level-dump episode map lumpnum)

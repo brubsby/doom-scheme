@@ -33,8 +33,19 @@ build/oracle/title.trace: build/oracle/doom-oracle wads/doom1.wad
 build/oracle/levels/.stamp: build/oracle/doom-oracle wads/doom1.wad tools/oracle/levels.sh
 	tools/oracle/levels.sh build/oracle/levels
 
+# Renderer reference frames: cameras from the maps' things, rendered by the
+# oracle right after each level loads (tools/oracle/render.sh).
+build/oracle/cameras/.stamp: wads/doom1.wad tools/oracle/cameras.py
+	python3 -I tools/oracle/cameras.py wads/doom1.wad build/oracle/cameras && touch $@
+build/oracle/render/.stamp: build/oracle/doom-oracle build/oracle/cameras/.stamp tools/oracle/render.sh
+	tools/oracle/render.sh build/oracle/cameras build/oracle/render
+
+# Regenerate the info/sounds tables from the C (output is committed).
+info:
+	python3 -I tools/infogen.py reference/doom/linuxdoom-1.10 src/doom
+
 test: wads/doom1.wad build/oracle/fixed-cases.txt build/oracle/tables.txt build/oracle/title.trace \
-      build/oracle/levels/.stamp
+      build/oracle/levels/.stamp build/oracle/render/.stamp
 	@for t in tests/*.ss; do [ $$t = tests/lib.ss ] && continue; \
 	  echo "== $$t"; scheme --libdirs src --script $$t || exit 1; done
 
@@ -44,4 +55,4 @@ run:
 clean:
 	rm -rf build
 
-.PHONY: all wad oracle oracle-traces test run clean FORCE
+.PHONY: all wad oracle oracle-traces info test run clean FORCE

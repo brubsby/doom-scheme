@@ -40,3 +40,13 @@
  
      bodyqueslot = 0;
      deathmatch_p = deathmatchstarts;
+@@ -688,6 +690,9 @@
+     if (precache)
+ 	R_PrecacheLevel ();
+ 
++    // oracle: render the level from scripted cameras (ORACLE_CAMERAS).
++    { void oracle_camera_probe (void); oracle_camera_probe (); }
++
+     //printf ("free memory: 0x%x\n", Z_FreeMemory());
+ 
+ }
