@@ -29,7 +29,12 @@ build/oracle/title.trace: build/oracle/doom-oracle wads/doom1.wad
 	  ORACLE_TRACE=$(CURDIR)/$@ ORACLE_MAX_FRAMES=1 \
 	  setarch -R build/oracle/doom-oracle > build/oracle/title.log 2>&1
 
-test: wads/doom1.wad build/oracle/fixed-cases.txt build/oracle/tables.txt build/oracle/title.trace
+# Per-map structure dumps and automap frames (tools/oracle/levels.sh).
+build/oracle/levels/.stamp: build/oracle/doom-oracle wads/doom1.wad tools/oracle/levels.sh
+	tools/oracle/levels.sh build/oracle/levels
+
+test: wads/doom1.wad build/oracle/fixed-cases.txt build/oracle/tables.txt build/oracle/title.trace \
+      build/oracle/levels/.stamp
 	@for t in tests/*.ss; do [ $$t = tests/lib.ss ] && continue; \
 	  echo "== $$t"; scheme --libdirs src --script $$t || exit 1; done
 

@@ -29,3 +29,14 @@
  
  #ifndef SNDSERV
  	// Sound mixing for the buffer is snychronous.
+--- linuxdoom-1.10/p_setup.c
++++ linuxdoom-1.10/p_setup.c
+@@ -658,6 +658,8 @@
+ 	
+     rejectmatrix = W_CacheLumpNum (lumpnum+ML_REJECT,PU_LEVEL);
+     P_GroupLines ();
++    // oracle: dump the loaded level before things spawn or specials run.
++    { void oracle_level_dump (int, int, int); oracle_level_dump (episode, map, lumpnum); }
+ 
+     bodyqueslot = 0;
+     deathmatch_p = deathmatchstarts;

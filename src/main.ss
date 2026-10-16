@@ -1,20 +1,16 @@
-;;; Milestone 1 demo: the title pages through w_wad + v_video + i_video.
-;;; Any key advances TITLEPIC -> CREDIT -> HELP1 -> HELP2 (with a status bar
-;;; and flipped face drawn over HELP2 to exercise the patch drawers).
-;;; ESC or closing the window quits.
+;;; Milestone 2 demo: a map loaded by p_setup, shown on the automap.
+;;; Starts on E1M1 with the automap open and the iddt cheat on (nothing has
+;;; been seen yet, since there is no renderer, so without it no lines would
+;;; show). The automap keys work as in Doom: arrows pan once follow mode is
+;;; off ('f'), '-' / '=' zoom, '0' whole map, 'g' grid, 'm' mark, 'c' clear
+;;; marks, iddt cycles the cheat. Demo-only keys: '[' / ']' previous / next
+;;; map, ESC quits.
 ;;;   DOOMWAD=path   (default wads/doom1.wad)
-;;;   SHOT=out.ppm   draw each page once, save the presented frames, and exit
-(import (chezscheme) (doom i_sdl) (doom i_video) (doom w_wad) (doom v_video)
-        (doom doomdef))
-
-(define pages '("TITLEPIC" "CREDIT" "HELP1" "HELP2"))
-
-(define (draw-page! i)
-  (let ([name (list-ref pages i)])
-    (v-draw-patch 0 0 0 (w-cache-lump-name name))
-    (when (string=? name "HELP2")
-      (v-draw-patch 0 (- SCREENHEIGHT 32) 0 (w-cache-lump-name "STBAR"))
-      (v-draw-patch-flipped 143 (- SCREENHEIGHT 32) 0 (w-cache-lump-name "STFST01")))))
+;;;   MAP=n          start on E1Mn (default 1)
+;;;   SHOT=out.ppm   save every map's automap (whole-map view) and exit
+(import (chezscheme) (doom i_sdl) (doom i_video) (doom i_system) (doom w_wad)
+        (doom v_video) (doom doomdef) (doom doomstat) (doom d_event) (doom r_data)
+        (doom p_setup) (doom am_map))
 
 (define (save-shot path)
   (let-values ([(w h bv) (i-read-pixels)])
@@ -27,29 +23,63 @@
             (put-u8 p (fxand (fxsrl px 8) 255))
             (put-u8 p (fxand px 255))))))))
 
+(define (press key)
+  (am-responder (make-event ev_keydown key 0 0))
+  (am-responder (make-event ev_keyup key 0 0)))
+
+(define nummaps 9)
+
+;; Load E1Mn and (re)open the automap on it.
+(define (load-map! n)
+  (when automapactive (press KEY_TAB))
+  (set! gameepisode 1)
+  (set! gamemap n)
+  (p-setup-level 1 n 0 sk_medium)
+  (press KEY_TAB))
+
+(define (draw!)
+  (am-drawer)
+  (v-draw-patch 0 (- SCREENHEIGHT 32) 0 (w-cache-lump-name "STBAR"))
+  (i-finish-update))
+
 (w-init-multiple-files (list (or (getenv "DOOMWAD") "wads/doom1.wad")))
+(set! gamemode shareware)
+(r-init-textures)
+(r-init-flats)
 (v-init)
 (i-init-graphics)
 (i-set-palette (w-cache-lump-name "PLAYPAL"))
+(vector-set! playeringame 0 #t)
+
+(load-map! (let ([m (getenv "MAP")]) (if m (string->number m) 1)))
+(for-each press (map char->integer (string->list "iddt")))
 
 (let ([shot (getenv "SHOT")])
   (if shot
-      (do ([i 0 (+ i 1)]) ((= i (length pages)))
-        (draw-page! i)
-        (i-finish-update)
-        (save-shot (format "~a-~a.ppm" (path-root shot) (list-ref pages i))))
-      (let loop ([page 0])
-        (draw-page! page)
-        (i-finish-update)
-        (let ([next page] [quit #f])
-          (unless (i-poll-events
+      (do ([m 1 (+ m 1)]) ((> m nummaps))
+        (load-map! m)
+        (press (char->integer #\0))
+        (am-ticker)
+        (draw!)
+        (save-shot (format "~a-E1M~a.ppm" (path-root shot) m)))
+      (let loop ([lasttic (i-get-time)])
+        (let ([quit #f])
+          (unless (i-get-events
                    (lambda (ev)
-                     (when (fx= (sdl-event-type ev) SDL_KEYDOWN)
-                       (if (fx= (sdl-event-key-sym ev) 27)
-                           (set! quit #t)
-                           (set! next (mod (+ page 1) (length pages)))))))
+                     (let ([key (event-data1 ev)])
+                       (cond
+                         [(fx= key KEY_ESCAPE) (set! quit #t)]
+                         ;; The map stays open in this demo.
+                         [(fx= key KEY_TAB) (void)]
+                         [(and (fx= (event-type ev) ev_keydown) (memv key '(91 93)))
+                          (load-map! (+ 1 (mod (+ (- gamemap 1) (if (fx= key 93) 1 -1)) nummaps)))]
+                         [else (am-responder ev)]))))
             (set! quit #t))
           (unless quit
-            (sdl-delay 10)
-            (loop next))))))
+            ;; Run the 35 Hz tickers for elapsed tics, then draw.
+            (let ([now (i-get-time)])
+              (do ([t lasttic (+ t 1)]) ((>= t now)) (am-ticker))
+              (draw!)
+              (sdl-delay 5)
+              (loop now)))))))
 (i-shutdown-graphics)

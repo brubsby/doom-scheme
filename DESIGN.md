@@ -57,7 +57,10 @@ src/doom/                one R6RS library per C file, same name: m_fixed.c -> (d
                          later info.c and sounds.c). Committed, never hand-edited.
   i_video.sls i_system.sls ...  platform layer, same interface as the C i_* files, on SDL2
   i_sdl.sls              raw SDL2 FFI bindings (no C counterpart)
+  doomstat.sls r_state.sls p_local.sls ...  shared state declared in a C header
+                         (see "Shared state" below)
   global.sls             define-global (see below)
+  struct.sls             define-struct: C structs as records (see below)
   trace.sls              oracle trace format/hashes (no C counterpart)
 src/main.ss              entry point
 tools/
@@ -83,6 +86,27 @@ and Chez also refuses an exported macro that `set!`s a private one. So
 `(define-global name init)` stores the value in a box and exports `name` as an
 identifier macro. Any module can then write `name` and `(set! name v)` exactly
 as in C, at the cost of one box indirection.
+
+**Shared state.** C's globals are often defined in one .c file and used from
+another, and the two .c files may need each other (p_setup calls
+`P_SpawnMapThing` in p_mobj, which writes p_setup's `playerstarts`). R6RS
+library imports must be acyclic. So a global declared `extern` in a header
+lives in that header's library: `doomstat` (game state, players, starts),
+`r_state` (level geometry), and `p_local` (blockmap, reject). Code then
+imports the header, as the C does. Globals private to one file, like the
+automap's `m_x` or `cheating`, stay plain `define`s in that file's library.
+
+**Structs.** `(define-struct name (parent) (field default) ...)` defines a
+record with mutable fields, accessors `name-field` and mutators
+`name-field-set!`. `(make-name)` returns a zeroed struct (defaults are
+evaluated per instance), and `(make-name f ...)` sets the fields directly.
+C's "struct begins with another struct" becomes a record parent:
+`thinker` ⊃ `degenmobj` ⊃ `mobj`. That's why a sector's sound origin
+(`degenmobj`) can be passed where C passes an `mobj_t*`. Pointers become
+references (`#f` for NULL). Map records carry their array `index` for the
+places where C subtracts pointers (`sec - sectors`). C enums are integer
+constants (`GS_LEVEL`, `sk_medium`, `pw_allmap`), because C does arithmetic and
+indexing with them and the trace prints them.
 
 ## Core representation choices
 
@@ -163,12 +187,17 @@ procedures using `(endianness little)`, so no `m_swap` is needed.
 The design's centerpiece is a **headless reference build of the C code** in
 `tools/oracle/`. It is linuxdoom-1.10 with the X11, sound, and network layers
 stubbed out. Its simulation is left **unpatched**, so the oracle *is* the
-target. The harness touches the original in only three ways:
+target. The harness touches the original only in these ways:
 - **Demo version check** (`tools/oracle/oracle.patch`). `G_DoPlayDemo` rejects
   demo version ≠ 110, but the shareware demos are version 109. The oracle
   accepts 109, and so does our port.
 - **Trace hook** (same patch). `D_DoomLoop` calls `oracle_tic()` after
   `D_Display`.
+- **Level dump hook** (same patch). `P_SetupLevel` calls
+  `oracle_level_dump()` right after `P_GroupLines`, before things spawn and
+  specials run. With `ORACLE_LEVELDUMP` set, it writes every vertex, sector,
+  side, line, subsector, node, and seg (pointers as indices), plus hashes of
+  the blockmap and reject lumps.
 - **Built 32-bit** (`gcc -m32` via `$ORACLE_CC` from the flake). The 1993 code
   assumes 32-bit pointers, and this way nothing in the original changes.
 
@@ -189,7 +218,10 @@ px py pz pangle pmomx pmomy health armor
 nmobjs mobjhash sectorhash framehash palettehash
 ```
 
-It can also dump `screens[0]` as PPM every N tics. Run
+It can also dump `screens[0]` as PPM every N tics, or as raw palette indices
+after every frame (`ORACLE_RAW_DIR`). `ORACLE_KEYS` posts scripted key presses
+after given frames, which is how we drive the oracle's automap without a
+demo. Run
 `make oracle-traces` to get the traces. DEMO1, DEMO2, and DEMO3 run 5026, 3836,
 and 2134 tics, in about 2 s each. The Scheme port emits the identical trace. `make sync-test` runs both on DEMO1–3 and reports the **first
 divergent tic** and which field diverged. That turns "the demo desynced
@@ -218,6 +250,14 @@ a byte of a heap pointer. As a result:
 Smaller layers get unit tests against values extracted from C: fixed math,
 `R_PointToAngle`, and `P_AproxDistance`.
 
+**Level and automap tests.** `tools/oracle/levels.sh` runs the oracle once per
+shareware map (`-warp 1 n`). It writes the level dump, then types TAB+`iddt`,
+`0`, and `g`, and saves the frame after each step. `tests/level.ss` prints
+the same dump from `p_setup` and requires it to match line for line.
+`tests/automap.ss` replays the keys into `am_map` and requires the automap
+area to match byte for byte. The rows where hu_stuff draws text (the message
+line and the level title) are left out until milestone 7.
+
 ## Milestones
 
 Each milestone ends with something visible or testable.
@@ -225,7 +265,7 @@ Each milestone ends with something visible or testable.
 0. ✅ **Bootstrap:** flake, SDL window, WAD fetch, oracle builds and traces DEMO1.
 1. ✅ **WAD + video:** `w_wad`, `v_video`, and the palette. Draws TITLEPIC and
    patches. Also `m_fixed`, `m_random`, and the generated `tables`.
-2. **Level load + automap:** `p_setup` and `am_map`. You can see E1M1 as lines.
+2. ✅ **Level load + automap:** `p_setup` and `am_map`. You can see E1M1 as lines.
 3. **Software renderer:** `r_bsp`, `r_segs`, `r_plane`, `r_draw`, `r_sky`,
    `r_things`, and `r_data` (textures, flats, colormaps). We get a free-look
    static camera, and framebuffers diff against the oracle.

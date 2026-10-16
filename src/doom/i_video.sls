@@ -3,8 +3,8 @@
 ;;; 4:3 aspect-corrected.
 (library (doom i_video)
   (export i-init-graphics i-shutdown-graphics i-set-palette i-finish-update
-          i-read-pixels i-poll-events)
-  (import (chezscheme) (doom i_sdl) (doom doomdef) (doom v_video))
+          i-read-pixels i-poll-events i-xlate-key i-get-events)
+  (import (chezscheme) (doom i_sdl) (doom doomdef) (doom v_video) (doom d_event))
 
   (define window 0)
   (define renderer 0)
@@ -82,4 +82,43 @@
       (cond
         [(fx= (sdl-poll-event ev) 0) #t]
         [(fx= (sdl-event-type ev) SDL_QUIT) #f]
-        [else (handle ev) (loop)]))))
+        [else (handle ev) (loop)])))
+
+  ;; xlatekey: SDL keycode -> doom key code, or #f for keys doom ignores.
+  ;; Follows linuxdoom's X11 table; SDL keycodes for printable keys are
+  ;; already lowercase ASCII.
+  (define (i-xlate-key sym)
+    (case sym
+      [(#x40000050) KEY_LEFTARROW]
+      [(#x4000004F) KEY_RIGHTARROW]
+      [(#x40000051) KEY_DOWNARROW]
+      [(#x40000052) KEY_UPARROW]
+      [(27) KEY_ESCAPE]
+      [(13 #x40000058) KEY_ENTER]               ; Return, keypad Enter
+      [(9) KEY_TAB]
+      [(#x4000003A) KEY_F1] [(#x4000003B) KEY_F2] [(#x4000003C) KEY_F3]
+      [(#x4000003D) KEY_F4] [(#x4000003E) KEY_F5] [(#x4000003F) KEY_F6]
+      [(#x40000040) KEY_F7] [(#x40000041) KEY_F8] [(#x40000042) KEY_F9]
+      [(#x40000043) KEY_F10] [(#x40000044) KEY_F11] [(#x40000045) KEY_F12]
+      [(8 127) KEY_BACKSPACE]                   ; Backspace, Delete
+      [(#x40000048) KEY_PAUSE]
+      [(#x40000067 61) KEY_EQUALS]              ; keypad =, =
+      [(#x40000056 45) KEY_MINUS]               ; keypad -, -
+      [(#x400000E1 #x400000E5) KEY_RSHIFT]
+      [(#x400000E0 #x400000E4) KEY_RCTRL]
+      [(#x400000E2 #x400000E6 #x400000E3 #x400000E7) KEY_RALT]  ; Alt, Meta/GUI
+      [else (and (fx<= 32 sym 126)
+                 (if (fx<= 65 sym 90) (fx+ sym 32) sym))]))
+
+  ;; I_GetEvent: translate pending SDL input into doom events, calling
+  ;; (post event) for each (C: D_PostEvent). Returns #f on SDL_QUIT.
+  ;; TODO(milestone 4): mouse.
+  (define (i-get-events post)
+    (i-poll-events
+     (lambda (ev)
+       (let ([type (sdl-event-type ev)])
+         (when (or (fx= type SDL_KEYDOWN) (fx= type SDL_KEYUP))
+           (let ([key (i-xlate-key (sdl-event-key-sym ev))])
+             (when key
+               (post (make-event (if (fx= type SDL_KEYDOWN) ev_keydown ev_keyup)
+                                 key 0 0))))))))))
