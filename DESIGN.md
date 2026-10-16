@@ -1,20 +1,36 @@
 # doom-scheme — design
 
-A port of id Software's DOOM (linuxdoom-1.10, `reference/doom/`) to Scheme.
+A port of id Software's DOOM to Scheme.
+
+**Target: linuxdoom-1.10** (`reference/doom/`), quirks and all. The C code is the
+spec. **Chocolate Doom 3.1.1** (`reference/chocolate-doom/`) is the second
+reference. It is a well-commented, actively maintained reading of the same
+engine, and we consult it for:
+- **What an obscure piece of C means**, plus the documented vanilla bugs.
+- **Clean SDL2 platform code to crib from** (`i_video.c`, `i_sound.c`, `i_input.c`).
+- **Edge cases that linuxdoom-1.10 leaves undefined.** Examples are reading past
+  the end of a lump, or overflow behavior (`intercepts`, `spechit`,
+  `visplanes`). When linuxdoom simply crashes or corrupts memory, we take
+  Chocolate Doom's emulated behavior.
+
+Where the two disagree on defined behavior, linuxdoom-1.10 wins.
 
 ## Goals
 
-1. **Vanilla-faithful.** Same fixed-point math, same tables, same RNG, same tic
-   order. The bar is that **the shareware demos (DEMO1–3 in `doom1.wad`) play back
-   in sync.** A demo is a recording of input only, so any divergence in the
-   simulation shows up as the player walking into a wall. That gives us a free,
-   strict end-to-end test.
+1. **Faithful to linuxdoom-1.10.** Same fixed-point math (including its
+   `double`-based `FixedDiv`), same tables, same RNG, same tic order. The bar is
+   that **the port's per-tic trace matches the headless linuxdoom-1.10 oracle
+   bit-for-bit** while it plays the shareware demos (DEMO1–3 in `doom1.wad`). A
+   demo records input only, so any divergence in the simulation shows up
+   immediately. That gives us a free, strict end-to-end test.
 2. **Readable against the C.** Every C module maps to one Scheme library with the
    same name, and every C function maps to a Scheme procedure with a predictable
    name (below). You should be able to open `p_map.c` and `src/p/map.sls` side by
    side and follow along.
-3. **Plays at 35 Hz at 320×200.** Native-compiled Scheme should do this
-   comfortably; stretch goal is a higher-res mode later.
+3. **Plays at 35 Hz at 320×200 first.** Native-compiled Scheme should do this
+   comfortably. A higher-resolution mode and an uncapped, interpolated framerate
+   are planned for later (see *Future: hi-res and uncapped*). We don't build
+   them now, but we avoid choices that would block them.
 
 Out of scope for now: netplay (IPX/serial), the DOS sound drivers, and the
 sound server process. We keep the `ticcmd_t` architecture because demos need it.
@@ -33,7 +49,8 @@ The dev environment is a Nix flake (`flake.nix`) that provides `chez` and `SDL2`
 ## Layout
 
 ```
-reference/doom/          git submodule: id-software/DOOM (read-only)
+reference/doom/          git submodule: id-software/DOOM — linuxdoom-1.10 is the target
+reference/chocolate-doom/ git submodule: Chocolate Doom 3.1.1 — second reference
 src/
   doom/                  one R6RS library per C module
     fixed.sls            m_fixed.c   (FixedMul, FixedDiv)
@@ -73,10 +90,13 @@ and `MF_SOLID`. The C prefix tells you the module.
 - `wrap32` gets applied wherever the C silently overflows. We find those places
   by diffing demo traces, not by guessing.
 
-**FixedDiv caveat.** linuxdoom-1.10's `FixedDiv2` uses `double` division (the
-integer version is `#if 0`'d out). DOS v1.9 used integer division. The two
-disagree in rare low-bit cases, which matters for demo sync against v1.9 demos.
-We implement the integer version; the oracle (below) tells us if that was right.
+**FixedDiv.** linuxdoom-1.10's `FixedDiv2` computes
+`(fixed_t)((double)a / (double)b * FRACUNIT)` (the integer version is `#if 0`'d
+out), and we match it exactly:
+`(flonum->fixnum (fl* (fl/ (fixnum->flonum a) (fixnum->flonum b)) 65536.0))`,
+truncating toward zero like a C cast. It differs from DOS v1.9's integer
+division in rare low-bit cases. That is fine, because our target is linuxdoom,
+not v1.9.
 
 **Structs → mutable records.** `mobj_t`, `player_t`, `sector_t`, `line_t`,
 `seg_t`, and the others become `define-record-type` with mutable fields. Hot
@@ -99,7 +119,7 @@ circular-import knot.
 (`PU_LEVEL` and the like) go away, because level data is simply dropped on
 reload. `W_CacheLumpNum` becomes a memoizing lump→bytevector cache.
 
-**Framebuffers.** `screens[0..4]` are 64,000-byte bytevectors of palette
+**Framebuffers.** `screens[0..4]` are `SCREENWIDTH*SCREENHEIGHT`-byte bytevectors of palette
 indices, exactly like the C code. The renderer writes palette indices. The
 platform layer converts to ARGB once per frame through a 256-entry palette
 lookup and uploads to an SDL streaming texture. Gamma and palette flashes
@@ -126,9 +146,18 @@ procedures using `(endianness little)`, so no `m_swap` is needed.
 
 The design's centerpiece is a **headless reference build of the C code** in
 `tools/oracle/`. It is linuxdoom-1.10 with the X11, sound, and network layers
-stubbed out, plus the patches needed to play v1.9 demos:
-- `G_DoPlayDemo` rejects demo version ≠ 110, so we accept 109.
-- `FixedDiv2` gets the integer version.
+stubbed out. Its simulation is left **unpatched**, so the oracle *is* the
+target. It needs two harness-only patches:
+- **Demo version check.** `G_DoPlayDemo` rejects demo version ≠ 110, but the
+  shareware demos are version 109. The oracle accepts 109, and so does our port.
+- **64-bit build fixes.** The 1993 code assumes 32-bit pointers (`int`↔pointer
+  casts in `w_wad`, `z_zone`, `r_data`, `p_setup`). Either we build with
+  `gcc -m32`, or we borrow Chocolate Doom's fixes for those spots. We prefer
+  `-m32` because it changes nothing about the original.
+
+Whether the oracle itself stays in sync with the v1.9 recordings doesn't matter
+to the gate. We only need to match the oracle. In practice the simulations
+should be nearly identical.
 
 At the end of each tic it prints a trace line:
 
@@ -173,12 +202,26 @@ Each milestone ends with something visible or testable.
 Roughly 45k lines of C, about 10k of which is data (`info.c` and `tables.c`) that
 gets generated rather than written.
 
-## Open questions
+## Future: hi-res and uncapped
 
-- Is the target strict DOS v1.9 behavior (demo sync with `doom1.wad`), or
-  linuxdoom-1.10 behavior, bugs and all? This doc assumes v1.9. Chocolate Doom
-  would be the tie-breaker reference for v1.9 semantics, and we could add it as a
-  second submodule if needed.
-- Do we want a higher-resolution or uncapped-framerate mode eventually? If so,
-  `SCREENWIDTH`/`SCREENHEIGHT` should be parameters from day one rather than
-  constants.
+Neither is built now, but these rules keep both cheap to add later.
+
+- **Resolution is a parameter, not a literal.** `SCREENWIDTH`, `SCREENHEIGHT`,
+  and everything derived from them (`viewwidth`, `centerx`, `yslope`,
+  `distscale`, the screen-size-dependent tables in `r_main`) are computed in one
+  place at startup. Nothing hardcodes 320, 200, 64000, or 168. Until hi-res
+  lands, the only legal value is 320×200, because the oracle's framebuffer diffs
+  assume it.
+- **2D assets keep 320×200 coordinates.** `v_video`'s patch drawing takes
+  virtual 320×200 coordinates and will scale to the real buffer later, so the
+  menu, HUD, and intermission code never learns the real size.
+- **Separate the simulation from rendering.** The playsim never reads anything
+  render-side, and the renderer only *reads* playsim state. For uncapped
+  framerate we will snapshot each mobj's, sector's, and the player's previous
+  position, angle, and height each tic, then render at `prev + frac·(cur-prev)`,
+  with `frac` from `I_GetTime` sub-tics. Keeping the renderer's inputs on a
+  short, explicit list of fields (gathered in `r_main`'s setup) makes that
+  change local.
+- **Fidelity mode stays the default.** Hi-res and interpolation are display
+  options. They never touch tic logic, so the sync test keeps working with them
+  turned on.

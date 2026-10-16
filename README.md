@@ -7,4 +7,4 @@ git clone --recursive git@github.com:brubsby/doom-scheme.git
 nix develop
 ```
 
-The original C source is in `reference/doom/` (git submodule) for side-by-side reading.
+Target is linuxdoom-1.10 (`reference/doom/`); Chocolate Doom 3.1.1 (`reference/chocolate-doom/`) is a second reference. Both are git submodules.

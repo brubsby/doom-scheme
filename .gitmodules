@@ -1,3 +1,6 @@
 [submodule "reference/doom"]
 	path = reference/doom
 	url = https://github.com/id-software/DOOM.git
+[submodule "reference/chocolate-doom"]
+	path = reference/chocolate-doom
+	url = https://github.com/chocolate-doom/chocolate-doom.git
