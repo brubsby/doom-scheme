@@ -1,7 +1,6 @@
 ;;; p_mobj.c: map objects. Included by p_local.sls.
 ;;;
-;;; Status: complete, except P_SpawnPlayer's weapon sprites
-;;; (P_SetupPsprites, milestone 5) and status bar / HUD wake-up
+;;; Status: complete, except P_SpawnPlayer's status bar / HUD wake-up
 ;;; (milestone 7).
 
 ;; P_SetMobjState: returns true if the mobj is still present. Calls the

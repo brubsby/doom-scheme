@@ -1,11 +1,11 @@
 ;;; The playsim against the oracle: synthetic -nomonsters demos
 ;;; (tools/oracle/demos.py) played by both, compared tic by tic.
 ;;;
-;;; Compared: gametic, gamestate, leveltime, the player's position, angle
-;;; and momentum, health, armor, and the count and hash of all mobjs (every
-;;; mobj's position, momentum, type, state, tics, health and flags). Not
-;;; yet: prndindex and sectorhash (the light thinkers aren't ported), and
-;;; rndindex, framehash and palettehash (the front end and sound aren't).
+;;; Compared: gametic, gamestate, leveltime, prndindex, the player's
+;;; position, angle and momentum, health, armor, the count and hash of all
+;;; mobjs (every mobj's position, momentum, type, state, tics, health and
+;;; flags), and the sector hash (heights, light, special). Not yet: rndindex,
+;;; framehash and palettehash (the front end and sound aren't ported).
 ;;;
 ;;; A demo is compared up to the tic before the port first calls a
 ;;; stand-in for an unported function (p_unported.ss), e.g. the first item
@@ -15,7 +15,8 @@
 (load "tests/lib.ss")
 
 (define compared-fields
-  '(gametic gamestate leveltime px py pz pangle pmomx pmomy health armor nmobjs mobjhash))
+  '(gametic gamestate leveltime prndindex px py pz pangle pmomx pmomy health armor nmobjs mobjhash
+    sectorhash))
 
 (define (field-index name)
   (let loop ([l trace-field-names] [i 0])
@@ -39,12 +40,19 @@
 (define total-compared 0)
 
 ;; Play one demo; returns (values compared-tics first-mismatch-or-#f).
+;; DEMO1-3 come from the IWAD (traces from make oracle-traces); the rest are
+;; files in build/oracle/demos.
+(define (iwad-demo? name) (member name '("demo1" "demo2" "demo3")))
 (define (run-demo name)
-  (let ([theirs (read-trace (format "build/oracle/demos/~a.trace" name))])
+  (let ([theirs (read-trace (if (iwad-demo? name)
+                                (format "build/oracle/~a.trace" name)
+                                (format "build/oracle/demos/~a.trace" name)))])
     (set! gametic 0)
     (set! unported-calls '())
     (set! unported-first-tic #f)
-    (g-play-demo-bytes (read-file (format "build/oracle/demos/~a.lmp" name)))
+    (g-play-demo-bytes (if (iwad-demo? name)
+                           (w-cache-lump-name (string-upcase name))
+                           (read-file (format "build/oracle/demos/~a.lmp" name))))
     (let loop ([i 0])
       (cond
         [(not (g-ticker))
@@ -78,8 +86,10 @@
                   [(null? unported-calls) (format "~a: ~a tics match (whole demo)" name n)]
                   [else (format "~a: ~a tics match, then ~a" name n (car unported-calls))])
             #f mismatch)))
- (let ([names (map path-root (filter (lambda (f) (string=? (path-extension f) "lmp"))
-                                     (directory-list "build/oracle/demos")))])
-   (list-sort string<? names)))
+ (or (let ([only (getenv "DEMOS")]) (and only (with-input-from-string (string-append "(" only ")")
+                                                (lambda () (map symbol->string (read))))))
+     (append '("demo1" "demo2" "demo3")
+             (list-sort string<? (map path-root (filter (lambda (f) (string=? (path-extension f) "lmp"))
+                                                        (directory-list "build/oracle/demos")))))))
 (printf "     (~a tics compared)\n" total-compared)
 (finish)

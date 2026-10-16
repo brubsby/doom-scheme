@@ -670,4 +670,8 @@
       (when (fx= cheating 2) (am-draw-things THINGCOLORS THINGRANGE))
       (am-draw-crosshair XHAIRCOLORS)
       (am-draw-marks)
-      (v-mark-rect f-x f-y f-w f-h))))
+      (v-mark-rect f-x f-y f-w f-h)))
+
+  ;; P_KillMobj calls AM_Stop through this hook (the playsim is below the
+  ;; automap).
+  (define hook-installed (begin (set! am-stop-hook am-stop) #t)))

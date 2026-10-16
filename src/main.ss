@@ -1,9 +1,11 @@
-;;; Milestone 4 demo: walk around E1M1 with collision.
-;;; A single player game on skill 3. Things animate but monsters don't act,
-;;; and items, doors, switches and damaging floors are milestone 5: when
-;;; you touch one, the console says which function isn't ported yet.
+;;; Milestone 5 demo: the game is playable (the front end is not).
+;;; A single player game on skill 3: monsters, weapons, doors, lifts,
+;;; switches, pickups and damage all work. There is no status bar, menu or
+;;; intermission yet (milestone 7): pickup messages print to the console,
+;;; and exiting a level starts the next one.
 ;;;   arrows        move / turn          , .   strafe     shift  run
-;;;   alt + arrows  strafe
+;;;   alt + arrows  strafe               ctrl  fire       space  use
+;;;   1-7           weapons
 ;;;   - =           shrink / grow the view (as in Doom)
 ;;;   F5            toggle low detail
 ;;;   TAB           automap (iddt works)
@@ -43,7 +45,8 @@
 (define turnheld 0)
 
 ;; A simplified G_BuildTiccmd (the real one is milestone 6): run with
-;; shift, strafe with alt or , . and the slow turn for the first tics.
+;; shift, strafe with alt or , . and the slow turn for the first tics; fire,
+;; use, and weapon changes.
 (define (build-ticcmd! cmd)
   (let* ([speed (if (held? KEY_RSHIFT) 1 0)]
          [strafe (held? KEY_RALT)]
@@ -60,7 +63,15 @@
       (ticcmd-angleturn-set! cmd (if strafe
                                      0
                                      (+ (if left turn 0) (if right (- turn) 0))))
-      (ticcmd-buttons-set! cmd 0))))
+      (ticcmd-buttons-set!
+       cmd
+       (let ([weapon (let loop ([k 1])
+                       (cond [(> k 7) #f]
+                             [(held? (+ 48 k)) (- k 1)]
+                             [else (loop (+ k 1))]))])
+         (fxior (if (held? KEY_RCTRL) BT_ATTACK 0)
+                (if (held? 32) BT_USE 0)
+                (if weapon (fxior BT_CHANGE (fxsll weapon BT_WEAPONSHIFT)) 0)))))))
 
 ;; D_Display, roughly: the view (or automap), its border, the status bar.
 (define (display!)
@@ -76,20 +87,24 @@
     (v-draw-patch 0 (- SCREENHEIGHT 32) 0 (w-cache-lump-name "STBAR")))
   (i-finish-update))
 
-;; Report each unported function the first time it is reached.
-(define reported '())
-(define (report-unported!)
-  (for-each (lambda (name)
-              (unless (memq name reported)
-                (set! reported (cons name reported))
-                (printf "not ported yet (milestone 5): ~a\n" name)))
-            unported-calls))
+;; Until the HUD exists, print the player's messages.
+(define last-message #f)
+(define (show-message!)
+  (let ([m (player-message player)])
+    (when (and m (not (eq? m last-message)))
+      (printf "~a\n" m))
+    (set! last-message m)))
 
 (define (tic!)
   (build-ticcmd! (vector-ref netcmds 0))
   (g-ticker)
   (set! gametic (+ gametic 1))
-  (report-unported!))
+  (show-message!)
+  ;; No intermission yet: on to the next map.
+  (when (memq 'ga_completed unported-calls)
+    (set! unported-calls '())
+    (set! unported-first-tic #f)
+    (new-game! (+ 1 (mod gamemap nummaps)))))
 
 (define (handle-key ev)
   (let ([key (event-data1 ev)] [pressed (fx= (event-type ev) ev_keydown)])

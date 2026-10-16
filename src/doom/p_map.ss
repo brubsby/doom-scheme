@@ -261,8 +261,11 @@
      (p-set-thing-position thing)
      ;; if any special lines were hit, do the effect
      (unless (fxlogtest (mobj-flags thing) (fxior MF_TELEPORT MF_NOCLIP))
+       ;; (C's `while (numspechit--)` leaves it at -1)
        (let loop ()
-         (unless (fx= numspechit 0)
+         (if (fx= numspechit 0)
+           (set! numspechit -1)
+           (begin
            (set! numspechit (fx- numspechit 1))
            ;; see if the line was crossed
            (let* ([ld (vector-ref spechit numspechit)]
@@ -270,7 +273,7 @@
                   [oldside (p-point-on-line-side oldx oldy ld)])
              (when (and (not (fx= side oldside)) (not (fx= (line-special ld) 0)))
                (p-cross-special-line (line-index ld) oldside thing)))
-           (loop))))
+           (loop)))))
      #t)))
 
 ;; P_ThingHeightClip: takes a valid thing and adjusts the thing->floorz,

@@ -14,8 +14,9 @@
           gamestate gametic
           players playeringame
           MAX_DM_STARTS deathmatchstarts deathmatch_p playerstarts
-          precache bodyqueslot maxammo)
-  (import (chezscheme) (doom global) (doom doomdef) (doom doomdata) (doom d_player))
+          precache bodyqueslot maxammo gameaction secretexit)
+  (import (chezscheme) (doom global) (doom doomdef) (doom doomdata) (doom d_player)
+          (doom d_event))
 
   (define-global gamemode indetermined)
   (define-global gamemission doom)
@@ -73,6 +74,10 @@
 
   (define-global precache #t)
   (define-global bodyqueslot 0)
+
+  ;; Defined in g_game.c; here because the playsim's level exits set them.
+  (define-global gameaction ga_nothing)
+  (define-global secretexit #f)
 
   ;; Ammo limits without a backpack (defined in p_inter.c).
   (define maxammo (fxvector 200 50 300 50)))

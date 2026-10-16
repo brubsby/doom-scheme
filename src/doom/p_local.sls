@@ -26,8 +26,13 @@
    p-player-think p-calc-height
    ;; p_setup
    p-setup-level p-init map-lump-name
+   ;; p_spec and friends
+   p-spawn-specials p-update-specials p-cross-special-line p-use-special-line
+   p-damage-mobj p-touch-special-thing g-exit-level g-secret-exit-level
+   ;; p_pspr
+   p-setup-psprites p-move-psprites p-drop-weapon
    ;; stand-ins for unported functions
-   unported-calls unported-first-tic
+   unported unported-calls unported-first-tic am-stop-hook
    ;; p_local.h
    FLOATSPEED MAXHEALTH VIEWHEIGHT
           MAPBLOCKUNITS MAPBLOCKSIZE MAPBLOCKSHIFT MAPBMASK MAPBTOFRAC
@@ -40,7 +45,8 @@
           (doom doomstat) (doom d_think) (doom d_player) (doom r_defs) (doom r_state)
           (doom r_data) (doom r_local) (doom p_mobj.h) (doom info) (doom m_fixed)
           (doom m_bbox) (doom m_random) (doom tables) (doom w_wad) (doom i_system)
-          (doom d_ticcmd) (doom d_event) (doom s_sound) (doom sounds))
+          (doom d_ticcmd) (doom d_event) (doom s_sound) (doom sounds) (doom d_items)
+          (doom dstrings))
 
   (define FLOATSPEED (* FRACUNIT 4))
   (define MAXHEALTH 100)
@@ -100,10 +106,6 @@
     (let ([a (p-random)])
       (fx- a (p-random))))
 
-  ;; Action functions by name (symbol -> procedure). The files that define
-  ;; actions add to it; p-init puts the procedures into the state table.
-  (define action-table (make-eq-hashtable))
-
   (include "p_unported.ss")
   (include "p_tick.ss")
   (include "p_maputl.ss")
@@ -111,4 +113,15 @@
   (include "p_sight.ss")
   (include "p_mobj.ss")
   (include "p_user.ss")
+  (include "p_spec.ss")
+  (include "p_lights.ss")
+  (include "p_floor.ss")
+  (include "p_doors.ss")
+  (include "p_ceilng.ss")
+  (include "p_plats.ss")
+  (include "p_switch.ss")
+  (include "p_telept.ss")
+  (include "p_inter.ss")
+  (include "p_pspr.ss")
+  (include "p_enemy.ss")
   (include "p_setup.ss"))

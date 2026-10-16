@@ -306,14 +306,20 @@
          ;; preload graphics
          (when precache (r-precache-level))))]))
 
-;; P_Init. TODO(milestone 5): P_InitSwitchList, P_InitPicAnims.
-;; Also resolves the state table's action names to procedures (C links them
-;; at compile time).
+;; The state table names its action functions; replace the names with the
+;; procedures (C links them at compile time). Done when p_local loads.
+(define actions-resolved
+  (let ([actions (append p-enemy-actions p-pspr-actions)])
+    (vector-for-each
+     (lambda (st)
+       (let ([a (state-action st)])
+         (when (symbol? a)
+           (state-action-set! st (cond [(assq a actions) => cdr] [else (unported-action a)])))))
+     states)
+    #t))
+
+;; P_Init
 (define (p-init)
-  (vector-for-each
-   (lambda (st)
-     (let ([a (state-action st)])
-       (when (symbol? a)
-         (state-action-set! st (or (hashtable-ref action-table a #f) (unported-action a))))))
-   states)
+  (p-init-switch-list)
+  (p-init-pic-anims)
   (r-init-sprites sprnames))

@@ -5,7 +5,7 @@
 ;;; player), demo playback, and G_Ticker's level path. Input, demo
 ;;; recording, saves, intermissions and netgames are milestone 6.
 (library (doom g_game)
-  (export gameaction netcmds demobuffer demo-p demo-ended
+  (export netcmds demobuffer demo-p demo-ended
           g-init-new g-do-load-level g-do-reborn g-ticker
           g-play-demo-bytes g-do-play-demo g-read-demo-ticcmd
           DEMOMARKER)
@@ -13,8 +13,6 @@
           (doom d_ticcmd) (doom d_player) (doom info) (doom m_fixed) (doom m_random)
           (doom w_wad) (doom r_data) (doom r_local) (doom p_local) (doom am_map)
           (doom s_sound) (doom struct) (doom i_system))
-
-  (define-global gameaction ga_nothing)
 
   ;; The commands for the current tic (C: netcmds[player][buf], filled by
   ;; G_BuildTiccmd and the network code).
@@ -180,7 +178,13 @@
         (cond
           [(fx= gameaction ga_loadlevel) (g-do-load-level)]
           [(fx= gameaction ga_playdemo) (g-do-play-demo)]
-          [else (i-error "G_Ticker: gameaction ~a is not ported yet" gameaction)])
+          [else
+           ;; TODO(milestone 6): ga_completed (G_DoCompleted), ga_worlddone,
+           ;; ga_victory, ga_newgame, loading and saving.
+           (unported (vector-ref '#(ga_nothing ga_loadlevel ga_newgame ga_loadgame ga_savegame
+                                    ga_playdemo ga_completed ga_victory ga_worlddone ga_screenshot)
+                                 gameaction))
+           (set! gameaction ga_nothing)])
         (loop)))
     ;; get commands
     (do ([i 0 (fx+ i 1)]) ((fx= i MAXPLAYERS))
