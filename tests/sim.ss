@@ -10,7 +10,7 @@
 ;;; A demo is compared up to the tic before the port first calls a
 ;;; stand-in for an unported function (p_unported.ss), e.g. the first item
 ;;; pickup or special line crossed.
-(import (chezscheme) (doom w_wad) (doom r_local) (doom p_local) (doom g_game)
+(import (chezscheme) (doom w_wad) (doom r_local) (doom p_local) (doom d_main) (doom i_system)
         (doom doomdef) (doom doomstat) (doom trace))
 (load "tests/lib.ss")
 
@@ -53,9 +53,13 @@
     (g-play-demo-bytes (if (iwad-demo? name)
                            (w-cache-lump-name (string-upcase name))
                            (read-file (format "build/oracle/demos/~a.lmp" name))))
+    ;; The demo ends as a timedemo does: G_CheckDemoStatus raises the
+    ;; "timed" error at the end marker, before that tic runs.
     (let loop ([i 0])
       (cond
-        [(not (g-ticker))
+        [(not (guard (c [(and (doom-error? c) (string=? "timed" (substring (condition-message c) 0 5))) #f])
+                (g-ticker)
+                #t))
          (values i #f)]
         [else
          (set! gametic (+ gametic 1))
@@ -77,6 +81,7 @@
 (set! gamemode shareware)
 (r-init 11 0)
 (p-init)
+(set! timingdemo #t)
 
 (for-each
  (lambda (name)

@@ -268,7 +268,8 @@
      (set! totalkills 0)
      (set! totalitems 0)
      (set! totalsecret 0)
-     ;; TODO(milestone 7): wminfo.maxfrags = 0, wminfo.partime = 180.
+     (wbstartstruct-maxfrags-set! wminfo 0)
+     (wbstartstruct-partime-set! wminfo 180)
      (vector-for-each
       (lambda (p)
         (player-killcount-set! p 0)

@@ -50,3 +50,19 @@
      //printf ("free memory: 0x%x\n", Z_FreeMemory());
  
  }
+--- linuxdoom-1.10/i_system.c
++++ linuxdoom-1.10/i_system.c
+@@ -91,7 +91,12 @@
+     struct timezone	tzp;
+     int			newtics;
+     static int		basetime=0;
+-  
++    // oracle: with ORACLE_FAKETIME, time advances one tic per call, so
++    // untimed runs (the title loop) are fast and repeatable.
++    static int		faketime = -1;
++    if (faketime == -1) faketime = getenv ("ORACLE_FAKETIME") ? 0 : -2;
++    if (faketime >= 0) return faketime++;
++
+     gettimeofday(&tp, &tzp);
+     if (!basetime)
+ 	basetime = tp.tv_sec;

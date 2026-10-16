@@ -10,6 +10,7 @@
 //   ORACLE_PPM_EVERY=n       ... every n tics (default 35)
 //   ORACLE_MAX_FRAMES=n      exit(0) after n frames (e.g. to grab the title
 //                            screen without -timedemo)
+//   ORACLE_MAX_GAMETIC=n     exit(0) after the first frame at gametic >= n
 //   ORACLE_RAW_DIR=dir       dump screens[0] (raw palette indices, 64000
 //                            bytes) after every frame as dir/fNNNN.raw,
 //                            frames counted from 1
@@ -60,6 +61,7 @@ static FILE* tracefile;
 static char* ppmdir;
 static int   ppmevery = 35;
 static int   maxframes = -1, frames;
+static int   maxgametic = -1;
 static char* rawdir;
 static char* keyscript;
 
@@ -276,6 +278,7 @@ void oracle_tic (void)
         if (getenv ("ORACLE_PPM_EVERY")) ppmevery = atoi (getenv ("ORACLE_PPM_EVERY"));
         if (getenv ("ORACLE_MAX_FRAMES")) maxframes = atoi (getenv ("ORACLE_MAX_FRAMES"));
         rawdir = getenv ("ORACLE_RAW_DIR");
+        if (getenv ("ORACLE_MAX_GAMETIC")) maxgametic = atoi (getenv ("ORACLE_MAX_GAMETIC"));
         keyscript = getenv ("ORACLE_KEYS");
     }
     frames++;
@@ -322,5 +325,7 @@ void oracle_tic (void)
     post_keys ();
 
     if (maxframes >= 0 && frames >= maxframes)
+        exit (0);
+    if (maxgametic >= 0 && gametic >= maxgametic)
         exit (0);
 }

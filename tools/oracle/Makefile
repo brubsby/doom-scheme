@@ -18,7 +18,7 @@ ORIG    := doomdef doomstat dstrings i_system i_main i_net tables f_finale \
 OURS    := i_video_null i_sound_null oracle
 OBJS    := $(addprefix $(B)/obj/,$(addsuffix .o,$(ORIG) $(OURS)))
 
-all: $(B)/doom-oracle $(B)/fixed_probe $(B)/tables_probe
+all: $(B)/doom-oracle $(B)/fixed_probe $(B)/tables_probe $(B)/ticcmd_probe
 
 $(B)/doom-oracle: $(OBJS)
 	$(CC) -o $@ $^ -lm
@@ -29,6 +29,12 @@ $(B)/fixed_probe: probes/fixed_probe.c $(B)/obj/m_fixed.o
 	$(CC) $(CFLAGS) -o $@ $^
 $(B)/tables_probe: probes/tables_probe.c $(addprefix $(B)/obj/,tables.o m_random.o v_video.o)
 	$(CC) $(CFLAGS) -o $@ $^
+
+# Probes that need the whole game: everything but i_main.o (they have
+# their own main).
+GAMEOBJS := $(filter-out $(B)/obj/i_main.o,$(OBJS))
+$(B)/ticcmd_probe: probes/ticcmd_probe.c $(GAMEOBJS)
+	$(CC) $(CFLAGS) -o $@ $^ -lm
 
 # Pristine copy of the reference source + oracle.patch.
 $(B)/src/.patched: oracle.patch

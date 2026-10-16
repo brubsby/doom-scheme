@@ -25,7 +25,22 @@
           player-extralight player-extralight-set!
           player-fixedcolormap player-fixedcolormap-set!
           player-colormap player-colormap-set! player-psprites player-psprites-set!
-          player-didsecret player-didsecret-set!)
+          player-didsecret player-didsecret-set!
+          wbplayerstruct make-wbplayerstruct wbplayerstruct?
+          wbplayerstruct-in wbplayerstruct-in-set! wbplayerstruct-skills wbplayerstruct-skills-set!
+          wbplayerstruct-sitems wbplayerstruct-sitems-set!
+          wbplayerstruct-ssecret wbplayerstruct-ssecret-set!
+          wbplayerstruct-stime wbplayerstruct-stime-set! wbplayerstruct-frags wbplayerstruct-frags-set!
+          wbplayerstruct-score wbplayerstruct-score-set!
+          wbstartstruct make-wbstartstruct wbstartstruct?
+          wbstartstruct-epsd wbstartstruct-epsd-set! wbstartstruct-didsecret wbstartstruct-didsecret-set!
+          wbstartstruct-last wbstartstruct-last-set! wbstartstruct-next wbstartstruct-next-set!
+          wbstartstruct-maxkills wbstartstruct-maxkills-set!
+          wbstartstruct-maxitems wbstartstruct-maxitems-set!
+          wbstartstruct-maxsecret wbstartstruct-maxsecret-set!
+          wbstartstruct-maxfrags wbstartstruct-maxfrags-set!
+          wbstartstruct-partime wbstartstruct-partime-set!
+          wbstartstruct-pnum wbstartstruct-pnum-set! wbstartstruct-plyr wbstartstruct-plyr-set!)
   (import (chezscheme) (doom struct) (doom doomdef) (doom d_ticcmd))
 
   (define PST_LIVE 0)
@@ -75,4 +90,22 @@
     (fixedcolormap 0)
     (colormap 0)
     (psprites (vector (make-pspdef) (make-pspdef)))
-    (didsecret #f)))
+    (didsecret #f))
+
+  ;; INTERMISSION: structure passed e.g. to WI_Start(wb)
+  (define-struct wbplayerstruct ()
+    (in #f)                     ; whether the player is in game
+    ;; Player stats, kills, collected items etc.
+    (skills 0) (sitems 0) (ssecret 0) (stime 0)
+    (frags (make-fxvector 4 0))
+    (score 0))                  ; current score on entry, modified on return
+
+  (define-struct wbstartstruct ()
+    (epsd 0)                    ; episode # (0-2)
+    (didsecret #f)              ; if true, splash the secret level
+    (last 0) (next 0)           ; previous and next levels, origin 0
+    (maxkills 0) (maxitems 0) (maxsecret 0) (maxfrags 0)
+    (partime 0)                 ; the par time
+    (pnum 0)                    ; index of this player in game
+    (plyr (vector (make-wbplayerstruct) (make-wbplayerstruct)
+                  (make-wbplayerstruct) (make-wbplayerstruct)))))

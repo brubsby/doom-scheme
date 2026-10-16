@@ -48,17 +48,22 @@ build/oracle/demos/.stamp: build/oracle/doom-oracle tools/oracle/demos.py tools/
 	done
 	touch $@
 
+# The title loop, with fake time (tests/loop.ss).
+build/oracle/attract.trace: build/oracle/doom-oracle wads/doom1.wad tools/oracle/attract.sh
+	tools/oracle/attract.sh $@ 12000
+
 # Regenerate the info/sounds tables from the C (output is committed).
 info:
 	python3 -I tools/infogen.py reference/doom/linuxdoom-1.10 src/doom
 
 test: wads/doom1.wad build/oracle/fixed-cases.txt build/oracle/tables.txt build/oracle/title.trace \
-      build/oracle/levels/.stamp build/oracle/render/.stamp build/oracle/demos/.stamp
+      build/oracle/levels/.stamp build/oracle/render/.stamp build/oracle/demos/.stamp \
+      build/oracle/attract.trace $(TRACES)
 	@for t in tests/*.ss; do [ $$t = tests/lib.ss ] && continue; \
 	  echo "== $$t"; scheme --libdirs src --script $$t || exit 1; done
 
 run:
-	scheme --libdirs src --script src/main.ss
+	scheme --libdirs src --script src/main.ss $(ARGS)
 
 clean:
 	rm -rf build

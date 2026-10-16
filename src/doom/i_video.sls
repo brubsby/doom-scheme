@@ -3,8 +3,9 @@
 ;;; 4:3 aspect-corrected.
 (library (doom i_video)
   (export i-init-graphics i-shutdown-graphics i-set-palette i-finish-update
-          i-read-pixels i-poll-events i-xlate-key i-get-events)
-  (import (chezscheme) (doom i_sdl) (doom doomdef) (doom v_video) (doom d_event))
+          i-read-pixels i-poll-events i-xlate-key i-get-events i-start-tic i-start-frame
+          i-update-no-blit)
+  (import (chezscheme) (doom i_sdl) (doom doomdef) (doom v_video) (doom d_event) (doom i_system))
 
   (define window 0)
   (define renderer 0)
@@ -58,6 +59,7 @@
 
   ;; I_FinishUpdate: show screens[0].
   (define (i-finish-update)
+   (unless (eqv? window 0)
     (let ([n (fx* SCREENWIDTH SCREENHEIGHT)])
       (do ([i 0 (fx+ i 1)]) ((fx= i n))
         (bytevector-u32-native-set! argb (fxsll i 2)
@@ -65,7 +67,7 @@
     (sdl-update-texture texture 0 argb (fx* SCREENWIDTH 4))
     (sdl-render-clear renderer)
     (sdl-render-copy renderer texture 0 0)
-    (sdl-render-present renderer))
+    (sdl-render-present renderer)))
 
   ;; For tests/screenshots: the whole presented window (physical pixels, so
   ;; including scaling and letterboxing) as ARGB8888 bytes.
@@ -121,4 +123,16 @@
            (let ([key (i-xlate-key (sdl-event-key-sym ev))])
              (when key
                (post (make-event (if (fx= type SDL_KEYDOWN) ev_keydown ev_keyup)
-                                 key 0 0))))))))))
+                                 key 0 0)))))))))
+
+  ;; I_StartTic: process pending input, posting events with `post` (C calls
+  ;; D_PostEvent, which is above this library). Closing the window quits.
+  ;; Does nothing before I_InitGraphics.
+  (define (i-start-tic post)
+    (unless (eqv? window 0)
+      (unless (i-get-events post)
+        (i-quit))))
+
+  ;; I_StartFrame, I_UpdateNoBlit: nothing to do here.
+  (define (i-start-frame) (void))
+  (define (i-update-no-blit) (void)))

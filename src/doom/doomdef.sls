@@ -4,7 +4,7 @@
 (library (doom doomdef)
   (export SCREENWIDTH SCREENHEIGHT MAXPLAYERS TICRATE
           shareware registered commercial retail indetermined
-          doom doom2 pack_tnt pack_plut none
+          doom doom2 pack_tnt pack_plut none english french german unknown
           GS_LEVEL GS_INTERMISSION GS_FINALE GS_DEMOSCREEN
           MTF_EASY MTF_NORMAL MTF_HARD MTF_AMBUSH
           sk_baby sk_easy sk_medium sk_hard sk_nightmare
@@ -40,6 +40,7 @@
 
   (define-enum shareware registered commercial retail indetermined)   ; GameMode_t
   (define-enum doom doom2 pack_tnt pack_plut none)                    ; GameMission_t
+  (define-enum english french german unknown)                         ; Language_t
   (define-enum GS_LEVEL GS_INTERMISSION GS_FINALE GS_DEMOSCREEN)      ; gamestate_t
 
   ;; Mapthing option flags.

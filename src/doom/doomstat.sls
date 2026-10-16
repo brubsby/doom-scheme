@@ -3,7 +3,7 @@
 ;;; them in the header's library keeps the import graph acyclic.
 ;;; Only what the ported modules use so far is here.
 (library (doom doomstat)
-  (export gamemode gamemission modifiedgame
+  (export gamemode gamemission modifiedgame language
           nomonsters respawnparm fastparm devparm
           startskill startepisode startmap autostart
           gameskill gameepisode gamemap respawnmonsters netgame deathmatch
@@ -14,12 +14,14 @@
           gamestate gametic
           players playeringame
           MAX_DM_STARTS deathmatchstarts deathmatch_p playerstarts
-          precache bodyqueslot maxammo gameaction secretexit)
+          precache bodyqueslot maxammo gameaction secretexit wminfo nodrawers noblit
+          singletics)
   (import (chezscheme) (doom global) (doom doomdef) (doom doomdata) (doom d_player)
           (doom d_event))
 
   (define-global gamemode indetermined)
   (define-global gamemission doom)
+  (define-global language english)
   ;; Set if a PWAD was added (sprite lumps are then looked up by name).
   (define-global modifiedgame #f)
 
@@ -78,6 +80,15 @@
   ;; Defined in g_game.c; here because the playsim's level exits set them.
   (define-global gameaction ga_nothing)
   (define-global secretexit #f)
+
+  ;; Parameters for the intermission (WI_Start).
+  (define wminfo (make-wbstartstruct))
+
+  ;; For comparative timing purposes (-timedemo, -nodraw, -noblit); also
+  ;; the debug flag that cancels adaptive tic timing.
+  (define-global nodrawers #f)
+  (define-global noblit #f)
+  (define-global singletics #f)
 
   ;; Ammo limits without a backpack (defined in p_inter.c).
   (define maxammo (fxvector 200 50 300 50)))
