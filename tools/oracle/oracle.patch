@@ -1,0 +1,31 @@
+--- linuxdoom-1.10/g_game.c
++++ linuxdoom-1.10/g_game.c
+@@ -1586,7 +1586,8 @@
+ 	 
+     gameaction = ga_nothing; 
+     demobuffer = demo_p = W_CacheLumpName (defdemoname, PU_STATIC); 
+-    if ( *demo_p++ != VERSION)
++    // oracle: also accept v1.9 demos (version 109), e.g. the shareware DEMO1-3.
++    if ( *demo_p++ != VERSION && demo_p[-1] != 109)
+     {
+       fprintf( stderr, "Demo is from a different game version!\n");
+       gameaction = ga_nothing;
+--- linuxdoom-1.10/d_main.c
++++ linuxdoom-1.10/d_main.c
+@@ -351,6 +351,8 @@
+ //
+ extern  boolean         demorecording;
+ 
++void oracle_tic (void);
++
+ void D_DoomLoop (void)
+ {
+     if (demorecording)
+@@ -393,6 +395,7 @@
+ 
+ 	// Update display, next frame, with current state.
+ 	D_Display ();
++	oracle_tic ();
+ 
+ #ifndef SNDSERV
+ 	// Sound mixing for the buffer is snychronous.

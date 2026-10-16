@@ -147,30 +147,57 @@ procedures using `(endianness little)`, so no `m_swap` is needed.
 The design's centerpiece is a **headless reference build of the C code** in
 `tools/oracle/`. It is linuxdoom-1.10 with the X11, sound, and network layers
 stubbed out. Its simulation is left **unpatched**, so the oracle *is* the
-target. It needs two harness-only patches:
-- **Demo version check.** `G_DoPlayDemo` rejects demo version ≠ 110, but the
-  shareware demos are version 109. The oracle accepts 109, and so does our port.
-- **64-bit build fixes.** The 1993 code assumes 32-bit pointers (`int`↔pointer
-  casts in `w_wad`, `z_zone`, `r_data`, `p_setup`). Either we build with
-  `gcc -m32`, or we borrow Chocolate Doom's fixes for those spots. We prefer
-  `-m32` because it changes nothing about the original.
+target. The harness touches the original in only three ways:
+- **Demo version check** (`tools/oracle/oracle.patch`). `G_DoPlayDemo` rejects
+  demo version ≠ 110, but the shareware demos are version 109. The oracle
+  accepts 109, and so does our port.
+- **Trace hook** (same patch). `D_DoomLoop` calls `oracle_tic()` after
+  `D_Display`.
+- **Built 32-bit** (`gcc -m32` via `$ORACLE_CC` from the flake). The 1993 code
+  assumes 32-bit pointers, and this way nothing in the original changes.
+
+`i_video.c` and `i_sound.c` are replaced by null layers. Rendering still happens
+into `screens[0]`, and the palette is captured.
 
 Whether the oracle itself stays in sync with the v1.9 recordings doesn't matter
 to the gate. We only need to match the oracle. In practice the simulations
 should be nearly identical.
 
-At the end of each tic it prints a trace line:
+Under `-timedemo`, which advances exactly one tic per frame, it writes one
+trace line per tic. The exact format and hash definitions are documented in
+`tools/oracle/oracle.c`:
 
 ```
-tic  prndindex  rndindex  player.x player.y player.z player.angle  health  #mobjs  hash(mobjs)
+gametic gamestate leveltime prndindex rndindex
+px py pz pangle pmomx pmomy health armor
+nmobjs mobjhash sectorhash framehash palettehash
 ```
 
-It can also dump `screens[0]` for chosen tics. The Scheme port emits the
-identical trace. `make sync-test` runs both on DEMO1–3 and reports the **first
+It can also dump `screens[0]` as PPM every N tics. Run
+`make oracle-traces` to get the traces. DEMO1, DEMO2, and DEMO3 run 5026, 3836,
+and 2134 tics, in about 2 s each. The Scheme port emits the identical trace. `make sync-test` runs both on DEMO1–3 and reports the **first
 divergent tic** and which field diverged. That turns "the demo desynced
 somewhere" into "on tic 412, `rndindex` differs, so an extra `P_Random` call
 happened". Renderer correctness gets the same treatment by comparing
 framebuffers byte-for-byte on demo tics.
+
+### Garbage reads
+
+Vanilla occasionally renders from memory it doesn't own. The first case we
+found is DEMO1, tic 606: a 1-pixel sprite column at the bottom edge of the view
+(the shotgun psprite). There, `dc_texturemid + (dc_yl-centery)*dc_iscale` goes
+negative, `(frac>>16)&127` wraps to texel 127, and the read lands past the end
+of the sprite post. It lands in the zone allocator's block header, which holds
+a byte of a heap pointer. As a result:
+- **The oracle runs with ASLR off** (`setarch -R`, in `tools/oracle/run.sh`).
+  With ASLR on, that pixel changes from run to run. With it off, traces are
+  byte-identical across runs.
+- **The port can't reproduce these pixels**, because they are bytes of C heap
+  pointers. Simulation fields are a hard gate. `framehash` is a hard gate
+  except on an explicit allowlist of (demo, tic) entries. Each entry needs a
+  pixel diff showing the mismatch is confined to identified garbage reads.
+  Reads past the end of a lump return 0 in the port. Chocolate Doom has the
+  same behavior here, so there is no better-defined value to copy.
 
 Smaller layers get unit tests against values extracted from C: fixed math,
 `R_PointToAngle`, and `P_AproxDistance`.
