@@ -277,7 +277,8 @@
       players)
      ;; Initial height of PointOfView will be set by player think.
      (player-viewz-set! (vector-ref players consoleplayer) 1)
-     ;; TODO(milestone 8): S_Start (make sure all sounds are stopped).
+     ;; Make sure all sounds are stopped before Z_FreeTags.
+     (s-start)
      (p-init-thinkers)
      (let ([lumpnum (w-get-num-for-name (map-lump-name episode map))])
        (set! leveltime 0)
@@ -297,10 +298,22 @@
          (set! deathmatch_p 0)
          (p-load-things (fx+ lumpnum ML_THINGS))
          ;; TODO(milestone 6): deathmatch respawn (G_DeathMatchSpawnPlayer).
-         ;; TODO(milestone 4/5): iquehead = iquetail = 0; P_SpawnSpecials.
+         ;; clear special respawning que
+         (set! iquehead 0)
+         (set! iquetail 0)
+         ;; set up world state
+         (p-spawn-specials)
          ;; preload graphics
          (when precache (r-precache-level))))]))
 
 ;; P_Init. TODO(milestone 5): P_InitSwitchList, P_InitPicAnims.
+;; Also resolves the state table's action names to procedures (C links them
+;; at compile time).
 (define (p-init)
+  (vector-for-each
+   (lambda (st)
+     (let ([a (state-action st)])
+       (when (symbol? a)
+         (state-action-set! st (or (hashtable-ref action-table a #f) (unported-action a))))))
+   states)
   (r-init-sprites sprnames))

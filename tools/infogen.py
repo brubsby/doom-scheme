@@ -137,8 +137,8 @@ def main():
         assert len(f) == 7, f
         action = f[3].strip("{} \t\n")
         action = "#f" if action == "NULL" else "'" + action
-        states.append("(make-state %d %d %d %s %d %d %d) ; %s"
-                      % (ev(f[0]), ev(f[1]), ev(f[2]), action, ev(f[4]), ev(f[5]), ev(f[6]),
+        states.append("(make-state %d %d %d %d %s %d %d %d) ; %s"
+                      % (i, ev(f[0]), ev(f[1]), ev(f[2]), action, ev(f[4]), ev(f[5]), ev(f[6]),
                          statenames[i]))
     assert len(states) == consts["NUMSTATES"], len(states)
 
@@ -157,7 +157,7 @@ def main():
 
     exports = (["state", "make-state", "state?"]
                + ["state-%s%s" % (f, s) for f in
-                  ("sprite", "frame", "tics", "action", "nextstate", "misc1", "misc2")
+                  ("index", "sprite", "frame", "tics", "action", "nextstate", "misc1", "misc2")
                   for s in ("", "-set!")]
                + ["mobjinfo", "make-mobjinfo", "mobjinfo?"]
                + ["mobjinfo-%s%s" % (f, s) for f in fields for s in ("", "-set!")]
@@ -167,8 +167,10 @@ def main():
         out.write(";;; info: sprites, the state table, and the thing type table.\n")
         out.write("(library (doom info)\n  (export\n   %s)\n" % "\n   ".join(exports))
         out.write("  (import (chezscheme) (doom struct))\n\n")
-        out.write("  ;; state_t. action is the action function's name (a symbol) or #f.\n")
-        out.write("  (define-struct state ()\n    (sprite 0) (frame 0) (tics 0) (action #f)"
+        out.write("  ;; state_t, plus its index in states (C: state - states). action is\n"
+                  "  ;; the action function's name (a symbol) or #f; the playsim replaces\n"
+                  "  ;; the symbols with procedures when it starts (p-init).\n")
+        out.write("  (define-struct state ()\n    (index 0) (sprite 0) (frame 0) (tics 0) (action #f)"
                   " (nextstate 0) (misc1 0) (misc2 0))\n\n")
         out.write("  ;; mobjinfo_t\n  (define-struct mobjinfo ()\n    %s)\n\n"
                   % "\n    ".join("(%s 0)" % f for f in fields))

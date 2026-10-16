@@ -6,6 +6,8 @@
    state
    make-state
    state?
+   state-index
+   state-index-set!
    state-sprite
    state-sprite-set!
    state-frame
@@ -1319,9 +1321,11 @@
    NUMMOBJTYPES)
   (import (chezscheme) (doom struct))
 
-  ;; state_t. action is the action function's name (a symbol) or #f.
+  ;; state_t, plus its index in states (C: state - states). action is
+  ;; the action function's name (a symbol) or #f; the playsim replaces
+  ;; the symbols with procedures when it starts (p-init).
   (define-struct state ()
-    (sprite 0) (frame 0) (tics 0) (action #f) (nextstate 0) (misc1 0) (misc2 0))
+    (index 0) (sprite 0) (frame 0) (tics 0) (action #f) (nextstate 0) (misc1 0) (misc2 0))
 
   ;; mobjinfo_t
   (define-struct mobjinfo ()
@@ -2617,973 +2621,973 @@
 
   (define states
     (vector
-     (make-state 0 0 -1 #f 0 0 0) ; S_NULL
-     (make-state 1 4 0 'A_Light0 0 0 0) ; S_LIGHTDONE
-     (make-state 2 0 1 'A_WeaponReady 2 0 0) ; S_PUNCH
-     (make-state 2 0 1 'A_Lower 3 0 0) ; S_PUNCHDOWN
-     (make-state 2 0 1 'A_Raise 4 0 0) ; S_PUNCHUP
-     (make-state 2 1 4 #f 6 0 0) ; S_PUNCH1
-     (make-state 2 2 4 'A_Punch 7 0 0) ; S_PUNCH2
-     (make-state 2 3 5 #f 8 0 0) ; S_PUNCH3
-     (make-state 2 2 4 #f 9 0 0) ; S_PUNCH4
-     (make-state 2 1 5 'A_ReFire 2 0 0) ; S_PUNCH5
-     (make-state 3 0 1 'A_WeaponReady 10 0 0) ; S_PISTOL
-     (make-state 3 0 1 'A_Lower 11 0 0) ; S_PISTOLDOWN
-     (make-state 3 0 1 'A_Raise 12 0 0) ; S_PISTOLUP
-     (make-state 3 0 4 #f 14 0 0) ; S_PISTOL1
-     (make-state 3 1 6 'A_FirePistol 15 0 0) ; S_PISTOL2
-     (make-state 3 2 4 #f 16 0 0) ; S_PISTOL3
-     (make-state 3 1 5 'A_ReFire 10 0 0) ; S_PISTOL4
-     (make-state 4 32768 7 'A_Light1 1 0 0) ; S_PISTOLFLASH
-     (make-state 1 0 1 'A_WeaponReady 18 0 0) ; S_SGUN
-     (make-state 1 0 1 'A_Lower 19 0 0) ; S_SGUNDOWN
-     (make-state 1 0 1 'A_Raise 20 0 0) ; S_SGUNUP
-     (make-state 1 0 3 #f 22 0 0) ; S_SGUN1
-     (make-state 1 0 7 'A_FireShotgun 23 0 0) ; S_SGUN2
-     (make-state 1 1 5 #f 24 0 0) ; S_SGUN3
-     (make-state 1 2 5 #f 25 0 0) ; S_SGUN4
-     (make-state 1 3 4 #f 26 0 0) ; S_SGUN5
-     (make-state 1 2 5 #f 27 0 0) ; S_SGUN6
-     (make-state 1 1 5 #f 28 0 0) ; S_SGUN7
-     (make-state 1 0 3 #f 29 0 0) ; S_SGUN8
-     (make-state 1 0 7 'A_ReFire 18 0 0) ; S_SGUN9
-     (make-state 5 32768 4 'A_Light1 31 0 0) ; S_SGUNFLASH1
-     (make-state 5 32769 3 'A_Light2 1 0 0) ; S_SGUNFLASH2
-     (make-state 6 0 1 'A_WeaponReady 32 0 0) ; S_DSGUN
-     (make-state 6 0 1 'A_Lower 33 0 0) ; S_DSGUNDOWN
-     (make-state 6 0 1 'A_Raise 34 0 0) ; S_DSGUNUP
-     (make-state 6 0 3 #f 36 0 0) ; S_DSGUN1
-     (make-state 6 0 7 'A_FireShotgun2 37 0 0) ; S_DSGUN2
-     (make-state 6 1 7 #f 38 0 0) ; S_DSGUN3
-     (make-state 6 2 7 'A_CheckReload 39 0 0) ; S_DSGUN4
-     (make-state 6 3 7 'A_OpenShotgun2 40 0 0) ; S_DSGUN5
-     (make-state 6 4 7 #f 41 0 0) ; S_DSGUN6
-     (make-state 6 5 7 'A_LoadShotgun2 42 0 0) ; S_DSGUN7
-     (make-state 6 6 6 #f 43 0 0) ; S_DSGUN8
-     (make-state 6 7 6 'A_CloseShotgun2 44 0 0) ; S_DSGUN9
-     (make-state 6 0 5 'A_ReFire 32 0 0) ; S_DSGUN10
-     (make-state 6 1 7 #f 46 0 0) ; S_DSNR1
-     (make-state 6 0 3 #f 33 0 0) ; S_DSNR2
-     (make-state 6 32776 5 'A_Light1 48 0 0) ; S_DSGUNFLASH1
-     (make-state 6 32777 4 'A_Light2 1 0 0) ; S_DSGUNFLASH2
-     (make-state 7 0 1 'A_WeaponReady 49 0 0) ; S_CHAIN
-     (make-state 7 0 1 'A_Lower 50 0 0) ; S_CHAINDOWN
-     (make-state 7 0 1 'A_Raise 51 0 0) ; S_CHAINUP
-     (make-state 7 0 4 'A_FireCGun 53 0 0) ; S_CHAIN1
-     (make-state 7 1 4 'A_FireCGun 54 0 0) ; S_CHAIN2
-     (make-state 7 1 0 'A_ReFire 49 0 0) ; S_CHAIN3
-     (make-state 8 32768 5 'A_Light1 1 0 0) ; S_CHAINFLASH1
-     (make-state 8 32769 5 'A_Light2 1 0 0) ; S_CHAINFLASH2
-     (make-state 9 0 1 'A_WeaponReady 57 0 0) ; S_MISSILE
-     (make-state 9 0 1 'A_Lower 58 0 0) ; S_MISSILEDOWN
-     (make-state 9 0 1 'A_Raise 59 0 0) ; S_MISSILEUP
-     (make-state 9 1 8 'A_GunFlash 61 0 0) ; S_MISSILE1
-     (make-state 9 1 12 'A_FireMissile 62 0 0) ; S_MISSILE2
-     (make-state 9 1 0 'A_ReFire 57 0 0) ; S_MISSILE3
-     (make-state 10 32768 3 'A_Light1 64 0 0) ; S_MISSILEFLASH1
-     (make-state 10 32769 4 #f 65 0 0) ; S_MISSILEFLASH2
-     (make-state 10 32770 4 'A_Light2 66 0 0) ; S_MISSILEFLASH3
-     (make-state 10 32771 4 'A_Light2 1 0 0) ; S_MISSILEFLASH4
-     (make-state 11 2 4 'A_WeaponReady 68 0 0) ; S_SAW
-     (make-state 11 3 4 'A_WeaponReady 67 0 0) ; S_SAWB
-     (make-state 11 2 1 'A_Lower 69 0 0) ; S_SAWDOWN
-     (make-state 11 2 1 'A_Raise 70 0 0) ; S_SAWUP
-     (make-state 11 0 4 'A_Saw 72 0 0) ; S_SAW1
-     (make-state 11 1 4 'A_Saw 73 0 0) ; S_SAW2
-     (make-state 11 1 0 'A_ReFire 67 0 0) ; S_SAW3
-     (make-state 12 0 1 'A_WeaponReady 74 0 0) ; S_PLASMA
-     (make-state 12 0 1 'A_Lower 75 0 0) ; S_PLASMADOWN
-     (make-state 12 0 1 'A_Raise 76 0 0) ; S_PLASMAUP
-     (make-state 12 0 3 'A_FirePlasma 78 0 0) ; S_PLASMA1
-     (make-state 12 1 20 'A_ReFire 74 0 0) ; S_PLASMA2
-     (make-state 13 32768 4 'A_Light1 1 0 0) ; S_PLASMAFLASH1
-     (make-state 13 32769 4 'A_Light1 1 0 0) ; S_PLASMAFLASH2
-     (make-state 14 0 1 'A_WeaponReady 81 0 0) ; S_BFG
-     (make-state 14 0 1 'A_Lower 82 0 0) ; S_BFGDOWN
-     (make-state 14 0 1 'A_Raise 83 0 0) ; S_BFGUP
-     (make-state 14 0 20 'A_BFGsound 85 0 0) ; S_BFG1
-     (make-state 14 1 10 'A_GunFlash 86 0 0) ; S_BFG2
-     (make-state 14 1 10 'A_FireBFG 87 0 0) ; S_BFG3
-     (make-state 14 1 20 'A_ReFire 81 0 0) ; S_BFG4
-     (make-state 15 32768 11 'A_Light1 89 0 0) ; S_BFGFLASH1
-     (make-state 15 32769 6 'A_Light2 1 0 0) ; S_BFGFLASH2
-     (make-state 16 2 8 #f 91 0 0) ; S_BLOOD1
-     (make-state 16 1 8 #f 92 0 0) ; S_BLOOD2
-     (make-state 16 0 8 #f 0 0 0) ; S_BLOOD3
-     (make-state 17 32768 4 #f 94 0 0) ; S_PUFF1
-     (make-state 17 1 4 #f 95 0 0) ; S_PUFF2
-     (make-state 17 2 4 #f 96 0 0) ; S_PUFF3
-     (make-state 17 3 4 #f 0 0 0) ; S_PUFF4
-     (make-state 18 32768 4 #f 98 0 0) ; S_TBALL1
-     (make-state 18 32769 4 #f 97 0 0) ; S_TBALL2
-     (make-state 18 32770 6 #f 100 0 0) ; S_TBALLX1
-     (make-state 18 32771 6 #f 101 0 0) ; S_TBALLX2
-     (make-state 18 32772 6 #f 0 0 0) ; S_TBALLX3
-     (make-state 19 32768 4 #f 103 0 0) ; S_RBALL1
-     (make-state 19 32769 4 #f 102 0 0) ; S_RBALL2
-     (make-state 19 32770 6 #f 105 0 0) ; S_RBALLX1
-     (make-state 19 32771 6 #f 106 0 0) ; S_RBALLX2
-     (make-state 19 32772 6 #f 0 0 0) ; S_RBALLX3
-     (make-state 20 32768 6 #f 108 0 0) ; S_PLASBALL
-     (make-state 20 32769 6 #f 107 0 0) ; S_PLASBALL2
-     (make-state 21 32768 4 #f 110 0 0) ; S_PLASEXP
-     (make-state 21 32769 4 #f 111 0 0) ; S_PLASEXP2
-     (make-state 21 32770 4 #f 112 0 0) ; S_PLASEXP3
-     (make-state 21 32771 4 #f 113 0 0) ; S_PLASEXP4
-     (make-state 21 32772 4 #f 0 0 0) ; S_PLASEXP5
-     (make-state 22 32768 1 #f 114 0 0) ; S_ROCKET
-     (make-state 23 32768 4 #f 116 0 0) ; S_BFGSHOT
-     (make-state 23 32769 4 #f 115 0 0) ; S_BFGSHOT2
-     (make-state 24 32768 8 #f 118 0 0) ; S_BFGLAND
-     (make-state 24 32769 8 #f 119 0 0) ; S_BFGLAND2
-     (make-state 24 32770 8 'A_BFGSpray 120 0 0) ; S_BFGLAND3
-     (make-state 24 32771 8 #f 121 0 0) ; S_BFGLAND4
-     (make-state 24 32772 8 #f 122 0 0) ; S_BFGLAND5
-     (make-state 24 32773 8 #f 0 0 0) ; S_BFGLAND6
-     (make-state 25 32768 8 #f 124 0 0) ; S_BFGEXP
-     (make-state 25 32769 8 #f 125 0 0) ; S_BFGEXP2
-     (make-state 25 32770 8 #f 126 0 0) ; S_BFGEXP3
-     (make-state 25 32771 8 #f 0 0 0) ; S_BFGEXP4
-     (make-state 22 32769 8 'A_Explode 128 0 0) ; S_EXPLODE1
-     (make-state 22 32770 6 #f 129 0 0) ; S_EXPLODE2
-     (make-state 22 32771 4 #f 0 0 0) ; S_EXPLODE3
-     (make-state 26 32768 6 #f 131 0 0) ; S_TFOG
-     (make-state 26 32769 6 #f 132 0 0) ; S_TFOG01
-     (make-state 26 32768 6 #f 133 0 0) ; S_TFOG02
-     (make-state 26 32769 6 #f 134 0 0) ; S_TFOG2
-     (make-state 26 32770 6 #f 135 0 0) ; S_TFOG3
-     (make-state 26 32771 6 #f 136 0 0) ; S_TFOG4
-     (make-state 26 32772 6 #f 137 0 0) ; S_TFOG5
-     (make-state 26 32773 6 #f 138 0 0) ; S_TFOG6
-     (make-state 26 32774 6 #f 139 0 0) ; S_TFOG7
-     (make-state 26 32775 6 #f 140 0 0) ; S_TFOG8
-     (make-state 26 32776 6 #f 141 0 0) ; S_TFOG9
-     (make-state 26 32777 6 #f 0 0 0) ; S_TFOG10
-     (make-state 27 32768 6 #f 143 0 0) ; S_IFOG
-     (make-state 27 32769 6 #f 144 0 0) ; S_IFOG01
-     (make-state 27 32768 6 #f 145 0 0) ; S_IFOG02
-     (make-state 27 32769 6 #f 146 0 0) ; S_IFOG2
-     (make-state 27 32770 6 #f 147 0 0) ; S_IFOG3
-     (make-state 27 32771 6 #f 148 0 0) ; S_IFOG4
-     (make-state 27 32772 6 #f 0 0 0) ; S_IFOG5
-     (make-state 28 0 -1 #f 0 0 0) ; S_PLAY
-     (make-state 28 0 4 #f 151 0 0) ; S_PLAY_RUN1
-     (make-state 28 1 4 #f 152 0 0) ; S_PLAY_RUN2
-     (make-state 28 2 4 #f 153 0 0) ; S_PLAY_RUN3
-     (make-state 28 3 4 #f 150 0 0) ; S_PLAY_RUN4
-     (make-state 28 4 12 #f 149 0 0) ; S_PLAY_ATK1
-     (make-state 28 32773 6 #f 154 0 0) ; S_PLAY_ATK2
-     (make-state 28 6 4 #f 157 0 0) ; S_PLAY_PAIN
-     (make-state 28 6 4 'A_Pain 149 0 0) ; S_PLAY_PAIN2
-     (make-state 28 7 10 #f 159 0 0) ; S_PLAY_DIE1
-     (make-state 28 8 10 'A_PlayerScream 160 0 0) ; S_PLAY_DIE2
-     (make-state 28 9 10 'A_Fall 161 0 0) ; S_PLAY_DIE3
-     (make-state 28 10 10 #f 162 0 0) ; S_PLAY_DIE4
-     (make-state 28 11 10 #f 163 0 0) ; S_PLAY_DIE5
-     (make-state 28 12 10 #f 164 0 0) ; S_PLAY_DIE6
-     (make-state 28 13 -1 #f 0 0 0) ; S_PLAY_DIE7
-     (make-state 28 14 5 #f 166 0 0) ; S_PLAY_XDIE1
-     (make-state 28 15 5 'A_XScream 167 0 0) ; S_PLAY_XDIE2
-     (make-state 28 16 5 'A_Fall 168 0 0) ; S_PLAY_XDIE3
-     (make-state 28 17 5 #f 169 0 0) ; S_PLAY_XDIE4
-     (make-state 28 18 5 #f 170 0 0) ; S_PLAY_XDIE5
-     (make-state 28 19 5 #f 171 0 0) ; S_PLAY_XDIE6
-     (make-state 28 20 5 #f 172 0 0) ; S_PLAY_XDIE7
-     (make-state 28 21 5 #f 173 0 0) ; S_PLAY_XDIE8
-     (make-state 28 22 -1 #f 0 0 0) ; S_PLAY_XDIE9
-     (make-state 29 0 10 'A_Look 175 0 0) ; S_POSS_STND
-     (make-state 29 1 10 'A_Look 174 0 0) ; S_POSS_STND2
-     (make-state 29 0 4 'A_Chase 177 0 0) ; S_POSS_RUN1
-     (make-state 29 0 4 'A_Chase 178 0 0) ; S_POSS_RUN2
-     (make-state 29 1 4 'A_Chase 179 0 0) ; S_POSS_RUN3
-     (make-state 29 1 4 'A_Chase 180 0 0) ; S_POSS_RUN4
-     (make-state 29 2 4 'A_Chase 181 0 0) ; S_POSS_RUN5
-     (make-state 29 2 4 'A_Chase 182 0 0) ; S_POSS_RUN6
-     (make-state 29 3 4 'A_Chase 183 0 0) ; S_POSS_RUN7
-     (make-state 29 3 4 'A_Chase 176 0 0) ; S_POSS_RUN8
-     (make-state 29 4 10 'A_FaceTarget 185 0 0) ; S_POSS_ATK1
-     (make-state 29 5 8 'A_PosAttack 186 0 0) ; S_POSS_ATK2
-     (make-state 29 4 8 #f 176 0 0) ; S_POSS_ATK3
-     (make-state 29 6 3 #f 188 0 0) ; S_POSS_PAIN
-     (make-state 29 6 3 'A_Pain 176 0 0) ; S_POSS_PAIN2
-     (make-state 29 7 5 #f 190 0 0) ; S_POSS_DIE1
-     (make-state 29 8 5 'A_Scream 191 0 0) ; S_POSS_DIE2
-     (make-state 29 9 5 'A_Fall 192 0 0) ; S_POSS_DIE3
-     (make-state 29 10 5 #f 193 0 0) ; S_POSS_DIE4
-     (make-state 29 11 -1 #f 0 0 0) ; S_POSS_DIE5
-     (make-state 29 12 5 #f 195 0 0) ; S_POSS_XDIE1
-     (make-state 29 13 5 'A_XScream 196 0 0) ; S_POSS_XDIE2
-     (make-state 29 14 5 'A_Fall 197 0 0) ; S_POSS_XDIE3
-     (make-state 29 15 5 #f 198 0 0) ; S_POSS_XDIE4
-     (make-state 29 16 5 #f 199 0 0) ; S_POSS_XDIE5
-     (make-state 29 17 5 #f 200 0 0) ; S_POSS_XDIE6
-     (make-state 29 18 5 #f 201 0 0) ; S_POSS_XDIE7
-     (make-state 29 19 5 #f 202 0 0) ; S_POSS_XDIE8
-     (make-state 29 20 -1 #f 0 0 0) ; S_POSS_XDIE9
-     (make-state 29 10 5 #f 204 0 0) ; S_POSS_RAISE1
-     (make-state 29 9 5 #f 205 0 0) ; S_POSS_RAISE2
-     (make-state 29 8 5 #f 206 0 0) ; S_POSS_RAISE3
-     (make-state 29 7 5 #f 176 0 0) ; S_POSS_RAISE4
-     (make-state 30 0 10 'A_Look 208 0 0) ; S_SPOS_STND
-     (make-state 30 1 10 'A_Look 207 0 0) ; S_SPOS_STND2
-     (make-state 30 0 3 'A_Chase 210 0 0) ; S_SPOS_RUN1
-     (make-state 30 0 3 'A_Chase 211 0 0) ; S_SPOS_RUN2
-     (make-state 30 1 3 'A_Chase 212 0 0) ; S_SPOS_RUN3
-     (make-state 30 1 3 'A_Chase 213 0 0) ; S_SPOS_RUN4
-     (make-state 30 2 3 'A_Chase 214 0 0) ; S_SPOS_RUN5
-     (make-state 30 2 3 'A_Chase 215 0 0) ; S_SPOS_RUN6
-     (make-state 30 3 3 'A_Chase 216 0 0) ; S_SPOS_RUN7
-     (make-state 30 3 3 'A_Chase 209 0 0) ; S_SPOS_RUN8
-     (make-state 30 4 10 'A_FaceTarget 218 0 0) ; S_SPOS_ATK1
-     (make-state 30 32773 10 'A_SPosAttack 219 0 0) ; S_SPOS_ATK2
-     (make-state 30 4 10 #f 209 0 0) ; S_SPOS_ATK3
-     (make-state 30 6 3 #f 221 0 0) ; S_SPOS_PAIN
-     (make-state 30 6 3 'A_Pain 209 0 0) ; S_SPOS_PAIN2
-     (make-state 30 7 5 #f 223 0 0) ; S_SPOS_DIE1
-     (make-state 30 8 5 'A_Scream 224 0 0) ; S_SPOS_DIE2
-     (make-state 30 9 5 'A_Fall 225 0 0) ; S_SPOS_DIE3
-     (make-state 30 10 5 #f 226 0 0) ; S_SPOS_DIE4
-     (make-state 30 11 -1 #f 0 0 0) ; S_SPOS_DIE5
-     (make-state 30 12 5 #f 228 0 0) ; S_SPOS_XDIE1
-     (make-state 30 13 5 'A_XScream 229 0 0) ; S_SPOS_XDIE2
-     (make-state 30 14 5 'A_Fall 230 0 0) ; S_SPOS_XDIE3
-     (make-state 30 15 5 #f 231 0 0) ; S_SPOS_XDIE4
-     (make-state 30 16 5 #f 232 0 0) ; S_SPOS_XDIE5
-     (make-state 30 17 5 #f 233 0 0) ; S_SPOS_XDIE6
-     (make-state 30 18 5 #f 234 0 0) ; S_SPOS_XDIE7
-     (make-state 30 19 5 #f 235 0 0) ; S_SPOS_XDIE8
-     (make-state 30 20 -1 #f 0 0 0) ; S_SPOS_XDIE9
-     (make-state 30 11 5 #f 237 0 0) ; S_SPOS_RAISE1
-     (make-state 30 10 5 #f 238 0 0) ; S_SPOS_RAISE2
-     (make-state 30 9 5 #f 239 0 0) ; S_SPOS_RAISE3
-     (make-state 30 8 5 #f 240 0 0) ; S_SPOS_RAISE4
-     (make-state 30 7 5 #f 209 0 0) ; S_SPOS_RAISE5
-     (make-state 31 0 10 'A_Look 242 0 0) ; S_VILE_STND
-     (make-state 31 1 10 'A_Look 241 0 0) ; S_VILE_STND2
-     (make-state 31 0 2 'A_VileChase 244 0 0) ; S_VILE_RUN1
-     (make-state 31 0 2 'A_VileChase 245 0 0) ; S_VILE_RUN2
-     (make-state 31 1 2 'A_VileChase 246 0 0) ; S_VILE_RUN3
-     (make-state 31 1 2 'A_VileChase 247 0 0) ; S_VILE_RUN4
-     (make-state 31 2 2 'A_VileChase 248 0 0) ; S_VILE_RUN5
-     (make-state 31 2 2 'A_VileChase 249 0 0) ; S_VILE_RUN6
-     (make-state 31 3 2 'A_VileChase 250 0 0) ; S_VILE_RUN7
-     (make-state 31 3 2 'A_VileChase 251 0 0) ; S_VILE_RUN8
-     (make-state 31 4 2 'A_VileChase 252 0 0) ; S_VILE_RUN9
-     (make-state 31 4 2 'A_VileChase 253 0 0) ; S_VILE_RUN10
-     (make-state 31 5 2 'A_VileChase 254 0 0) ; S_VILE_RUN11
-     (make-state 31 5 2 'A_VileChase 243 0 0) ; S_VILE_RUN12
-     (make-state 31 32774 0 'A_VileStart 256 0 0) ; S_VILE_ATK1
-     (make-state 31 32774 10 'A_FaceTarget 257 0 0) ; S_VILE_ATK2
-     (make-state 31 32775 8 'A_VileTarget 258 0 0) ; S_VILE_ATK3
-     (make-state 31 32776 8 'A_FaceTarget 259 0 0) ; S_VILE_ATK4
-     (make-state 31 32777 8 'A_FaceTarget 260 0 0) ; S_VILE_ATK5
-     (make-state 31 32778 8 'A_FaceTarget 261 0 0) ; S_VILE_ATK6
-     (make-state 31 32779 8 'A_FaceTarget 262 0 0) ; S_VILE_ATK7
-     (make-state 31 32780 8 'A_FaceTarget 263 0 0) ; S_VILE_ATK8
-     (make-state 31 32781 8 'A_FaceTarget 264 0 0) ; S_VILE_ATK9
-     (make-state 31 32782 8 'A_VileAttack 265 0 0) ; S_VILE_ATK10
-     (make-state 31 32783 20 #f 243 0 0) ; S_VILE_ATK11
-     (make-state 31 32794 10 #f 267 0 0) ; S_VILE_HEAL1
-     (make-state 31 32795 10 #f 268 0 0) ; S_VILE_HEAL2
-     (make-state 31 32796 10 #f 243 0 0) ; S_VILE_HEAL3
-     (make-state 31 16 5 #f 270 0 0) ; S_VILE_PAIN
-     (make-state 31 16 5 'A_Pain 243 0 0) ; S_VILE_PAIN2
-     (make-state 31 16 7 #f 272 0 0) ; S_VILE_DIE1
-     (make-state 31 17 7 'A_Scream 273 0 0) ; S_VILE_DIE2
-     (make-state 31 18 7 'A_Fall 274 0 0) ; S_VILE_DIE3
-     (make-state 31 19 7 #f 275 0 0) ; S_VILE_DIE4
-     (make-state 31 20 7 #f 276 0 0) ; S_VILE_DIE5
-     (make-state 31 21 7 #f 277 0 0) ; S_VILE_DIE6
-     (make-state 31 22 7 #f 278 0 0) ; S_VILE_DIE7
-     (make-state 31 23 5 #f 279 0 0) ; S_VILE_DIE8
-     (make-state 31 24 5 #f 280 0 0) ; S_VILE_DIE9
-     (make-state 31 25 -1 #f 0 0 0) ; S_VILE_DIE10
-     (make-state 32 32768 2 'A_StartFire 282 0 0) ; S_FIRE1
-     (make-state 32 32769 2 'A_Fire 283 0 0) ; S_FIRE2
-     (make-state 32 32768 2 'A_Fire 284 0 0) ; S_FIRE3
-     (make-state 32 32769 2 'A_Fire 285 0 0) ; S_FIRE4
-     (make-state 32 32770 2 'A_FireCrackle 286 0 0) ; S_FIRE5
-     (make-state 32 32769 2 'A_Fire 287 0 0) ; S_FIRE6
-     (make-state 32 32770 2 'A_Fire 288 0 0) ; S_FIRE7
-     (make-state 32 32769 2 'A_Fire 289 0 0) ; S_FIRE8
-     (make-state 32 32770 2 'A_Fire 290 0 0) ; S_FIRE9
-     (make-state 32 32771 2 'A_Fire 291 0 0) ; S_FIRE10
-     (make-state 32 32770 2 'A_Fire 292 0 0) ; S_FIRE11
-     (make-state 32 32771 2 'A_Fire 293 0 0) ; S_FIRE12
-     (make-state 32 32770 2 'A_Fire 294 0 0) ; S_FIRE13
-     (make-state 32 32771 2 'A_Fire 295 0 0) ; S_FIRE14
-     (make-state 32 32772 2 'A_Fire 296 0 0) ; S_FIRE15
-     (make-state 32 32771 2 'A_Fire 297 0 0) ; S_FIRE16
-     (make-state 32 32772 2 'A_Fire 298 0 0) ; S_FIRE17
-     (make-state 32 32771 2 'A_Fire 299 0 0) ; S_FIRE18
-     (make-state 32 32772 2 'A_FireCrackle 300 0 0) ; S_FIRE19
-     (make-state 32 32773 2 'A_Fire 301 0 0) ; S_FIRE20
-     (make-state 32 32772 2 'A_Fire 302 0 0) ; S_FIRE21
-     (make-state 32 32773 2 'A_Fire 303 0 0) ; S_FIRE22
-     (make-state 32 32772 2 'A_Fire 304 0 0) ; S_FIRE23
-     (make-state 32 32773 2 'A_Fire 305 0 0) ; S_FIRE24
-     (make-state 32 32774 2 'A_Fire 306 0 0) ; S_FIRE25
-     (make-state 32 32775 2 'A_Fire 307 0 0) ; S_FIRE26
-     (make-state 32 32774 2 'A_Fire 308 0 0) ; S_FIRE27
-     (make-state 32 32775 2 'A_Fire 309 0 0) ; S_FIRE28
-     (make-state 32 32774 2 'A_Fire 310 0 0) ; S_FIRE29
-     (make-state 32 32775 2 'A_Fire 0 0 0) ; S_FIRE30
-     (make-state 17 1 4 #f 312 0 0) ; S_SMOKE1
-     (make-state 17 2 4 #f 313 0 0) ; S_SMOKE2
-     (make-state 17 1 4 #f 314 0 0) ; S_SMOKE3
-     (make-state 17 2 4 #f 315 0 0) ; S_SMOKE4
-     (make-state 17 3 4 #f 0 0 0) ; S_SMOKE5
-     (make-state 33 32768 2 'A_Tracer 317 0 0) ; S_TRACER
-     (make-state 33 32769 2 'A_Tracer 316 0 0) ; S_TRACER2
-     (make-state 34 32768 8 #f 319 0 0) ; S_TRACEEXP1
-     (make-state 34 32769 6 #f 320 0 0) ; S_TRACEEXP2
-     (make-state 34 32770 4 #f 0 0 0) ; S_TRACEEXP3
-     (make-state 35 0 10 'A_Look 322 0 0) ; S_SKEL_STND
-     (make-state 35 1 10 'A_Look 321 0 0) ; S_SKEL_STND2
-     (make-state 35 0 2 'A_Chase 324 0 0) ; S_SKEL_RUN1
-     (make-state 35 0 2 'A_Chase 325 0 0) ; S_SKEL_RUN2
-     (make-state 35 1 2 'A_Chase 326 0 0) ; S_SKEL_RUN3
-     (make-state 35 1 2 'A_Chase 327 0 0) ; S_SKEL_RUN4
-     (make-state 35 2 2 'A_Chase 328 0 0) ; S_SKEL_RUN5
-     (make-state 35 2 2 'A_Chase 329 0 0) ; S_SKEL_RUN6
-     (make-state 35 3 2 'A_Chase 330 0 0) ; S_SKEL_RUN7
-     (make-state 35 3 2 'A_Chase 331 0 0) ; S_SKEL_RUN8
-     (make-state 35 4 2 'A_Chase 332 0 0) ; S_SKEL_RUN9
-     (make-state 35 4 2 'A_Chase 333 0 0) ; S_SKEL_RUN10
-     (make-state 35 5 2 'A_Chase 334 0 0) ; S_SKEL_RUN11
-     (make-state 35 5 2 'A_Chase 323 0 0) ; S_SKEL_RUN12
-     (make-state 35 6 0 'A_FaceTarget 336 0 0) ; S_SKEL_FIST1
-     (make-state 35 6 6 'A_SkelWhoosh 337 0 0) ; S_SKEL_FIST2
-     (make-state 35 7 6 'A_FaceTarget 338 0 0) ; S_SKEL_FIST3
-     (make-state 35 8 6 'A_SkelFist 323 0 0) ; S_SKEL_FIST4
-     (make-state 35 32777 0 'A_FaceTarget 340 0 0) ; S_SKEL_MISS1
-     (make-state 35 32777 10 'A_FaceTarget 341 0 0) ; S_SKEL_MISS2
-     (make-state 35 10 10 'A_SkelMissile 342 0 0) ; S_SKEL_MISS3
-     (make-state 35 10 10 'A_FaceTarget 323 0 0) ; S_SKEL_MISS4
-     (make-state 35 11 5 #f 344 0 0) ; S_SKEL_PAIN
-     (make-state 35 11 5 'A_Pain 323 0 0) ; S_SKEL_PAIN2
-     (make-state 35 11 7 #f 346 0 0) ; S_SKEL_DIE1
-     (make-state 35 12 7 #f 347 0 0) ; S_SKEL_DIE2
-     (make-state 35 13 7 'A_Scream 348 0 0) ; S_SKEL_DIE3
-     (make-state 35 14 7 'A_Fall 349 0 0) ; S_SKEL_DIE4
-     (make-state 35 15 7 #f 350 0 0) ; S_SKEL_DIE5
-     (make-state 35 16 -1 #f 0 0 0) ; S_SKEL_DIE6
-     (make-state 35 16 5 #f 352 0 0) ; S_SKEL_RAISE1
-     (make-state 35 15 5 #f 353 0 0) ; S_SKEL_RAISE2
-     (make-state 35 14 5 #f 354 0 0) ; S_SKEL_RAISE3
-     (make-state 35 13 5 #f 355 0 0) ; S_SKEL_RAISE4
-     (make-state 35 12 5 #f 356 0 0) ; S_SKEL_RAISE5
-     (make-state 35 11 5 #f 323 0 0) ; S_SKEL_RAISE6
-     (make-state 36 32768 4 #f 358 0 0) ; S_FATSHOT1
-     (make-state 36 32769 4 #f 357 0 0) ; S_FATSHOT2
-     (make-state 22 32769 8 #f 360 0 0) ; S_FATSHOTX1
-     (make-state 22 32770 6 #f 361 0 0) ; S_FATSHOTX2
-     (make-state 22 32771 4 #f 0 0 0) ; S_FATSHOTX3
-     (make-state 37 0 15 'A_Look 363 0 0) ; S_FATT_STND
-     (make-state 37 1 15 'A_Look 362 0 0) ; S_FATT_STND2
-     (make-state 37 0 4 'A_Chase 365 0 0) ; S_FATT_RUN1
-     (make-state 37 0 4 'A_Chase 366 0 0) ; S_FATT_RUN2
-     (make-state 37 1 4 'A_Chase 367 0 0) ; S_FATT_RUN3
-     (make-state 37 1 4 'A_Chase 368 0 0) ; S_FATT_RUN4
-     (make-state 37 2 4 'A_Chase 369 0 0) ; S_FATT_RUN5
-     (make-state 37 2 4 'A_Chase 370 0 0) ; S_FATT_RUN6
-     (make-state 37 3 4 'A_Chase 371 0 0) ; S_FATT_RUN7
-     (make-state 37 3 4 'A_Chase 372 0 0) ; S_FATT_RUN8
-     (make-state 37 4 4 'A_Chase 373 0 0) ; S_FATT_RUN9
-     (make-state 37 4 4 'A_Chase 374 0 0) ; S_FATT_RUN10
-     (make-state 37 5 4 'A_Chase 375 0 0) ; S_FATT_RUN11
-     (make-state 37 5 4 'A_Chase 364 0 0) ; S_FATT_RUN12
-     (make-state 37 6 20 'A_FatRaise 377 0 0) ; S_FATT_ATK1
-     (make-state 37 32775 10 'A_FatAttack1 378 0 0) ; S_FATT_ATK2
-     (make-state 37 8 5 'A_FaceTarget 379 0 0) ; S_FATT_ATK3
-     (make-state 37 6 5 'A_FaceTarget 380 0 0) ; S_FATT_ATK4
-     (make-state 37 32775 10 'A_FatAttack2 381 0 0) ; S_FATT_ATK5
-     (make-state 37 8 5 'A_FaceTarget 382 0 0) ; S_FATT_ATK6
-     (make-state 37 6 5 'A_FaceTarget 383 0 0) ; S_FATT_ATK7
-     (make-state 37 32775 10 'A_FatAttack3 384 0 0) ; S_FATT_ATK8
-     (make-state 37 8 5 'A_FaceTarget 385 0 0) ; S_FATT_ATK9
-     (make-state 37 6 5 'A_FaceTarget 364 0 0) ; S_FATT_ATK10
-     (make-state 37 9 3 #f 387 0 0) ; S_FATT_PAIN
-     (make-state 37 9 3 'A_Pain 364 0 0) ; S_FATT_PAIN2
-     (make-state 37 10 6 #f 389 0 0) ; S_FATT_DIE1
-     (make-state 37 11 6 'A_Scream 390 0 0) ; S_FATT_DIE2
-     (make-state 37 12 6 'A_Fall 391 0 0) ; S_FATT_DIE3
-     (make-state 37 13 6 #f 392 0 0) ; S_FATT_DIE4
-     (make-state 37 14 6 #f 393 0 0) ; S_FATT_DIE5
-     (make-state 37 15 6 #f 394 0 0) ; S_FATT_DIE6
-     (make-state 37 16 6 #f 395 0 0) ; S_FATT_DIE7
-     (make-state 37 17 6 #f 396 0 0) ; S_FATT_DIE8
-     (make-state 37 18 6 #f 397 0 0) ; S_FATT_DIE9
-     (make-state 37 19 -1 'A_BossDeath 0 0 0) ; S_FATT_DIE10
-     (make-state 37 17 5 #f 399 0 0) ; S_FATT_RAISE1
-     (make-state 37 16 5 #f 400 0 0) ; S_FATT_RAISE2
-     (make-state 37 15 5 #f 401 0 0) ; S_FATT_RAISE3
-     (make-state 37 14 5 #f 402 0 0) ; S_FATT_RAISE4
-     (make-state 37 13 5 #f 403 0 0) ; S_FATT_RAISE5
-     (make-state 37 12 5 #f 404 0 0) ; S_FATT_RAISE6
-     (make-state 37 11 5 #f 405 0 0) ; S_FATT_RAISE7
-     (make-state 37 10 5 #f 364 0 0) ; S_FATT_RAISE8
-     (make-state 38 0 10 'A_Look 407 0 0) ; S_CPOS_STND
-     (make-state 38 1 10 'A_Look 406 0 0) ; S_CPOS_STND2
-     (make-state 38 0 3 'A_Chase 409 0 0) ; S_CPOS_RUN1
-     (make-state 38 0 3 'A_Chase 410 0 0) ; S_CPOS_RUN2
-     (make-state 38 1 3 'A_Chase 411 0 0) ; S_CPOS_RUN3
-     (make-state 38 1 3 'A_Chase 412 0 0) ; S_CPOS_RUN4
-     (make-state 38 2 3 'A_Chase 413 0 0) ; S_CPOS_RUN5
-     (make-state 38 2 3 'A_Chase 414 0 0) ; S_CPOS_RUN6
-     (make-state 38 3 3 'A_Chase 415 0 0) ; S_CPOS_RUN7
-     (make-state 38 3 3 'A_Chase 408 0 0) ; S_CPOS_RUN8
-     (make-state 38 4 10 'A_FaceTarget 417 0 0) ; S_CPOS_ATK1
-     (make-state 38 32773 4 'A_CPosAttack 418 0 0) ; S_CPOS_ATK2
-     (make-state 38 32772 4 'A_CPosAttack 419 0 0) ; S_CPOS_ATK3
-     (make-state 38 5 1 'A_CPosRefire 417 0 0) ; S_CPOS_ATK4
-     (make-state 38 6 3 #f 421 0 0) ; S_CPOS_PAIN
-     (make-state 38 6 3 'A_Pain 408 0 0) ; S_CPOS_PAIN2
-     (make-state 38 7 5 #f 423 0 0) ; S_CPOS_DIE1
-     (make-state 38 8 5 'A_Scream 424 0 0) ; S_CPOS_DIE2
-     (make-state 38 9 5 'A_Fall 425 0 0) ; S_CPOS_DIE3
-     (make-state 38 10 5 #f 426 0 0) ; S_CPOS_DIE4
-     (make-state 38 11 5 #f 427 0 0) ; S_CPOS_DIE5
-     (make-state 38 12 5 #f 428 0 0) ; S_CPOS_DIE6
-     (make-state 38 13 -1 #f 0 0 0) ; S_CPOS_DIE7
-     (make-state 38 14 5 #f 430 0 0) ; S_CPOS_XDIE1
-     (make-state 38 15 5 'A_XScream 431 0 0) ; S_CPOS_XDIE2
-     (make-state 38 16 5 'A_Fall 432 0 0) ; S_CPOS_XDIE3
-     (make-state 38 17 5 #f 433 0 0) ; S_CPOS_XDIE4
-     (make-state 38 18 5 #f 434 0 0) ; S_CPOS_XDIE5
-     (make-state 38 19 -1 #f 0 0 0) ; S_CPOS_XDIE6
-     (make-state 38 13 5 #f 436 0 0) ; S_CPOS_RAISE1
-     (make-state 38 12 5 #f 437 0 0) ; S_CPOS_RAISE2
-     (make-state 38 11 5 #f 438 0 0) ; S_CPOS_RAISE3
-     (make-state 38 10 5 #f 439 0 0) ; S_CPOS_RAISE4
-     (make-state 38 9 5 #f 440 0 0) ; S_CPOS_RAISE5
-     (make-state 38 8 5 #f 441 0 0) ; S_CPOS_RAISE6
-     (make-state 38 7 5 #f 408 0 0) ; S_CPOS_RAISE7
-     (make-state 0 0 10 'A_Look 443 0 0) ; S_TROO_STND
-     (make-state 0 1 10 'A_Look 442 0 0) ; S_TROO_STND2
-     (make-state 0 0 3 'A_Chase 445 0 0) ; S_TROO_RUN1
-     (make-state 0 0 3 'A_Chase 446 0 0) ; S_TROO_RUN2
-     (make-state 0 1 3 'A_Chase 447 0 0) ; S_TROO_RUN3
-     (make-state 0 1 3 'A_Chase 448 0 0) ; S_TROO_RUN4
-     (make-state 0 2 3 'A_Chase 449 0 0) ; S_TROO_RUN5
-     (make-state 0 2 3 'A_Chase 450 0 0) ; S_TROO_RUN6
-     (make-state 0 3 3 'A_Chase 451 0 0) ; S_TROO_RUN7
-     (make-state 0 3 3 'A_Chase 444 0 0) ; S_TROO_RUN8
-     (make-state 0 4 8 'A_FaceTarget 453 0 0) ; S_TROO_ATK1
-     (make-state 0 5 8 'A_FaceTarget 454 0 0) ; S_TROO_ATK2
-     (make-state 0 6 6 'A_TroopAttack 444 0 0) ; S_TROO_ATK3
-     (make-state 0 7 2 #f 456 0 0) ; S_TROO_PAIN
-     (make-state 0 7 2 'A_Pain 444 0 0) ; S_TROO_PAIN2
-     (make-state 0 8 8 #f 458 0 0) ; S_TROO_DIE1
-     (make-state 0 9 8 'A_Scream 459 0 0) ; S_TROO_DIE2
-     (make-state 0 10 6 #f 460 0 0) ; S_TROO_DIE3
-     (make-state 0 11 6 'A_Fall 461 0 0) ; S_TROO_DIE4
-     (make-state 0 12 -1 #f 0 0 0) ; S_TROO_DIE5
-     (make-state 0 13 5 #f 463 0 0) ; S_TROO_XDIE1
-     (make-state 0 14 5 'A_XScream 464 0 0) ; S_TROO_XDIE2
-     (make-state 0 15 5 #f 465 0 0) ; S_TROO_XDIE3
-     (make-state 0 16 5 'A_Fall 466 0 0) ; S_TROO_XDIE4
-     (make-state 0 17 5 #f 467 0 0) ; S_TROO_XDIE5
-     (make-state 0 18 5 #f 468 0 0) ; S_TROO_XDIE6
-     (make-state 0 19 5 #f 469 0 0) ; S_TROO_XDIE7
-     (make-state 0 20 -1 #f 0 0 0) ; S_TROO_XDIE8
-     (make-state 0 12 8 #f 471 0 0) ; S_TROO_RAISE1
-     (make-state 0 11 8 #f 472 0 0) ; S_TROO_RAISE2
-     (make-state 0 10 6 #f 473 0 0) ; S_TROO_RAISE3
-     (make-state 0 9 6 #f 474 0 0) ; S_TROO_RAISE4
-     (make-state 0 8 6 #f 444 0 0) ; S_TROO_RAISE5
-     (make-state 39 0 10 'A_Look 476 0 0) ; S_SARG_STND
-     (make-state 39 1 10 'A_Look 475 0 0) ; S_SARG_STND2
-     (make-state 39 0 2 'A_Chase 478 0 0) ; S_SARG_RUN1
-     (make-state 39 0 2 'A_Chase 479 0 0) ; S_SARG_RUN2
-     (make-state 39 1 2 'A_Chase 480 0 0) ; S_SARG_RUN3
-     (make-state 39 1 2 'A_Chase 481 0 0) ; S_SARG_RUN4
-     (make-state 39 2 2 'A_Chase 482 0 0) ; S_SARG_RUN5
-     (make-state 39 2 2 'A_Chase 483 0 0) ; S_SARG_RUN6
-     (make-state 39 3 2 'A_Chase 484 0 0) ; S_SARG_RUN7
-     (make-state 39 3 2 'A_Chase 477 0 0) ; S_SARG_RUN8
-     (make-state 39 4 8 'A_FaceTarget 486 0 0) ; S_SARG_ATK1
-     (make-state 39 5 8 'A_FaceTarget 487 0 0) ; S_SARG_ATK2
-     (make-state 39 6 8 'A_SargAttack 477 0 0) ; S_SARG_ATK3
-     (make-state 39 7 2 #f 489 0 0) ; S_SARG_PAIN
-     (make-state 39 7 2 'A_Pain 477 0 0) ; S_SARG_PAIN2
-     (make-state 39 8 8 #f 491 0 0) ; S_SARG_DIE1
-     (make-state 39 9 8 'A_Scream 492 0 0) ; S_SARG_DIE2
-     (make-state 39 10 4 #f 493 0 0) ; S_SARG_DIE3
-     (make-state 39 11 4 'A_Fall 494 0 0) ; S_SARG_DIE4
-     (make-state 39 12 4 #f 495 0 0) ; S_SARG_DIE5
-     (make-state 39 13 -1 #f 0 0 0) ; S_SARG_DIE6
-     (make-state 39 13 5 #f 497 0 0) ; S_SARG_RAISE1
-     (make-state 39 12 5 #f 498 0 0) ; S_SARG_RAISE2
-     (make-state 39 11 5 #f 499 0 0) ; S_SARG_RAISE3
-     (make-state 39 10 5 #f 500 0 0) ; S_SARG_RAISE4
-     (make-state 39 9 5 #f 501 0 0) ; S_SARG_RAISE5
-     (make-state 39 8 5 #f 477 0 0) ; S_SARG_RAISE6
-     (make-state 40 0 10 'A_Look 502 0 0) ; S_HEAD_STND
-     (make-state 40 0 3 'A_Chase 503 0 0) ; S_HEAD_RUN1
-     (make-state 40 1 5 'A_FaceTarget 505 0 0) ; S_HEAD_ATK1
-     (make-state 40 2 5 'A_FaceTarget 506 0 0) ; S_HEAD_ATK2
-     (make-state 40 32771 5 'A_HeadAttack 503 0 0) ; S_HEAD_ATK3
-     (make-state 40 4 3 #f 508 0 0) ; S_HEAD_PAIN
-     (make-state 40 4 3 'A_Pain 509 0 0) ; S_HEAD_PAIN2
-     (make-state 40 5 6 #f 503 0 0) ; S_HEAD_PAIN3
-     (make-state 40 6 8 #f 511 0 0) ; S_HEAD_DIE1
-     (make-state 40 7 8 'A_Scream 512 0 0) ; S_HEAD_DIE2
-     (make-state 40 8 8 #f 513 0 0) ; S_HEAD_DIE3
-     (make-state 40 9 8 #f 514 0 0) ; S_HEAD_DIE4
-     (make-state 40 10 8 'A_Fall 515 0 0) ; S_HEAD_DIE5
-     (make-state 40 11 -1 #f 0 0 0) ; S_HEAD_DIE6
-     (make-state 40 11 8 #f 517 0 0) ; S_HEAD_RAISE1
-     (make-state 40 10 8 #f 518 0 0) ; S_HEAD_RAISE2
-     (make-state 40 9 8 #f 519 0 0) ; S_HEAD_RAISE3
-     (make-state 40 8 8 #f 520 0 0) ; S_HEAD_RAISE4
-     (make-state 40 7 8 #f 521 0 0) ; S_HEAD_RAISE5
-     (make-state 40 6 8 #f 503 0 0) ; S_HEAD_RAISE6
-     (make-state 41 32768 4 #f 523 0 0) ; S_BRBALL1
-     (make-state 41 32769 4 #f 522 0 0) ; S_BRBALL2
-     (make-state 41 32770 6 #f 525 0 0) ; S_BRBALLX1
-     (make-state 41 32771 6 #f 526 0 0) ; S_BRBALLX2
-     (make-state 41 32772 6 #f 0 0 0) ; S_BRBALLX3
-     (make-state 42 0 10 'A_Look 528 0 0) ; S_BOSS_STND
-     (make-state 42 1 10 'A_Look 527 0 0) ; S_BOSS_STND2
-     (make-state 42 0 3 'A_Chase 530 0 0) ; S_BOSS_RUN1
-     (make-state 42 0 3 'A_Chase 531 0 0) ; S_BOSS_RUN2
-     (make-state 42 1 3 'A_Chase 532 0 0) ; S_BOSS_RUN3
-     (make-state 42 1 3 'A_Chase 533 0 0) ; S_BOSS_RUN4
-     (make-state 42 2 3 'A_Chase 534 0 0) ; S_BOSS_RUN5
-     (make-state 42 2 3 'A_Chase 535 0 0) ; S_BOSS_RUN6
-     (make-state 42 3 3 'A_Chase 536 0 0) ; S_BOSS_RUN7
-     (make-state 42 3 3 'A_Chase 529 0 0) ; S_BOSS_RUN8
-     (make-state 42 4 8 'A_FaceTarget 538 0 0) ; S_BOSS_ATK1
-     (make-state 42 5 8 'A_FaceTarget 539 0 0) ; S_BOSS_ATK2
-     (make-state 42 6 8 'A_BruisAttack 529 0 0) ; S_BOSS_ATK3
-     (make-state 42 7 2 #f 541 0 0) ; S_BOSS_PAIN
-     (make-state 42 7 2 'A_Pain 529 0 0) ; S_BOSS_PAIN2
-     (make-state 42 8 8 #f 543 0 0) ; S_BOSS_DIE1
-     (make-state 42 9 8 'A_Scream 544 0 0) ; S_BOSS_DIE2
-     (make-state 42 10 8 #f 545 0 0) ; S_BOSS_DIE3
-     (make-state 42 11 8 'A_Fall 546 0 0) ; S_BOSS_DIE4
-     (make-state 42 12 8 #f 547 0 0) ; S_BOSS_DIE5
-     (make-state 42 13 8 #f 548 0 0) ; S_BOSS_DIE6
-     (make-state 42 14 -1 'A_BossDeath 0 0 0) ; S_BOSS_DIE7
-     (make-state 42 14 8 #f 550 0 0) ; S_BOSS_RAISE1
-     (make-state 42 13 8 #f 551 0 0) ; S_BOSS_RAISE2
-     (make-state 42 12 8 #f 552 0 0) ; S_BOSS_RAISE3
-     (make-state 42 11 8 #f 553 0 0) ; S_BOSS_RAISE4
-     (make-state 42 10 8 #f 554 0 0) ; S_BOSS_RAISE5
-     (make-state 42 9 8 #f 555 0 0) ; S_BOSS_RAISE6
-     (make-state 42 8 8 #f 529 0 0) ; S_BOSS_RAISE7
-     (make-state 43 0 10 'A_Look 557 0 0) ; S_BOS2_STND
-     (make-state 43 1 10 'A_Look 556 0 0) ; S_BOS2_STND2
-     (make-state 43 0 3 'A_Chase 559 0 0) ; S_BOS2_RUN1
-     (make-state 43 0 3 'A_Chase 560 0 0) ; S_BOS2_RUN2
-     (make-state 43 1 3 'A_Chase 561 0 0) ; S_BOS2_RUN3
-     (make-state 43 1 3 'A_Chase 562 0 0) ; S_BOS2_RUN4
-     (make-state 43 2 3 'A_Chase 563 0 0) ; S_BOS2_RUN5
-     (make-state 43 2 3 'A_Chase 564 0 0) ; S_BOS2_RUN6
-     (make-state 43 3 3 'A_Chase 565 0 0) ; S_BOS2_RUN7
-     (make-state 43 3 3 'A_Chase 558 0 0) ; S_BOS2_RUN8
-     (make-state 43 4 8 'A_FaceTarget 567 0 0) ; S_BOS2_ATK1
-     (make-state 43 5 8 'A_FaceTarget 568 0 0) ; S_BOS2_ATK2
-     (make-state 43 6 8 'A_BruisAttack 558 0 0) ; S_BOS2_ATK3
-     (make-state 43 7 2 #f 570 0 0) ; S_BOS2_PAIN
-     (make-state 43 7 2 'A_Pain 558 0 0) ; S_BOS2_PAIN2
-     (make-state 43 8 8 #f 572 0 0) ; S_BOS2_DIE1
-     (make-state 43 9 8 'A_Scream 573 0 0) ; S_BOS2_DIE2
-     (make-state 43 10 8 #f 574 0 0) ; S_BOS2_DIE3
-     (make-state 43 11 8 'A_Fall 575 0 0) ; S_BOS2_DIE4
-     (make-state 43 12 8 #f 576 0 0) ; S_BOS2_DIE5
-     (make-state 43 13 8 #f 577 0 0) ; S_BOS2_DIE6
-     (make-state 43 14 -1 #f 0 0 0) ; S_BOS2_DIE7
-     (make-state 43 14 8 #f 579 0 0) ; S_BOS2_RAISE1
-     (make-state 43 13 8 #f 580 0 0) ; S_BOS2_RAISE2
-     (make-state 43 12 8 #f 581 0 0) ; S_BOS2_RAISE3
-     (make-state 43 11 8 #f 582 0 0) ; S_BOS2_RAISE4
-     (make-state 43 10 8 #f 583 0 0) ; S_BOS2_RAISE5
-     (make-state 43 9 8 #f 584 0 0) ; S_BOS2_RAISE6
-     (make-state 43 8 8 #f 558 0 0) ; S_BOS2_RAISE7
-     (make-state 44 32768 10 'A_Look 586 0 0) ; S_SKULL_STND
-     (make-state 44 32769 10 'A_Look 585 0 0) ; S_SKULL_STND2
-     (make-state 44 32768 6 'A_Chase 588 0 0) ; S_SKULL_RUN1
-     (make-state 44 32769 6 'A_Chase 587 0 0) ; S_SKULL_RUN2
-     (make-state 44 32770 10 'A_FaceTarget 590 0 0) ; S_SKULL_ATK1
-     (make-state 44 32771 4 'A_SkullAttack 591 0 0) ; S_SKULL_ATK2
-     (make-state 44 32770 4 #f 592 0 0) ; S_SKULL_ATK3
-     (make-state 44 32771 4 #f 591 0 0) ; S_SKULL_ATK4
-     (make-state 44 32772 3 #f 594 0 0) ; S_SKULL_PAIN
-     (make-state 44 32772 3 'A_Pain 587 0 0) ; S_SKULL_PAIN2
-     (make-state 44 32773 6 #f 596 0 0) ; S_SKULL_DIE1
-     (make-state 44 32774 6 'A_Scream 597 0 0) ; S_SKULL_DIE2
-     (make-state 44 32775 6 #f 598 0 0) ; S_SKULL_DIE3
-     (make-state 44 32776 6 'A_Fall 599 0 0) ; S_SKULL_DIE4
-     (make-state 44 9 6 #f 600 0 0) ; S_SKULL_DIE5
-     (make-state 44 10 6 #f 0 0 0) ; S_SKULL_DIE6
-     (make-state 45 0 10 'A_Look 602 0 0) ; S_SPID_STND
-     (make-state 45 1 10 'A_Look 601 0 0) ; S_SPID_STND2
-     (make-state 45 0 3 'A_Metal 604 0 0) ; S_SPID_RUN1
-     (make-state 45 0 3 'A_Chase 605 0 0) ; S_SPID_RUN2
-     (make-state 45 1 3 'A_Chase 606 0 0) ; S_SPID_RUN3
-     (make-state 45 1 3 'A_Chase 607 0 0) ; S_SPID_RUN4
-     (make-state 45 2 3 'A_Metal 608 0 0) ; S_SPID_RUN5
-     (make-state 45 2 3 'A_Chase 609 0 0) ; S_SPID_RUN6
-     (make-state 45 3 3 'A_Chase 610 0 0) ; S_SPID_RUN7
-     (make-state 45 3 3 'A_Chase 611 0 0) ; S_SPID_RUN8
-     (make-state 45 4 3 'A_Metal 612 0 0) ; S_SPID_RUN9
-     (make-state 45 4 3 'A_Chase 613 0 0) ; S_SPID_RUN10
-     (make-state 45 5 3 'A_Chase 614 0 0) ; S_SPID_RUN11
-     (make-state 45 5 3 'A_Chase 603 0 0) ; S_SPID_RUN12
-     (make-state 45 32768 20 'A_FaceTarget 616 0 0) ; S_SPID_ATK1
-     (make-state 45 32774 4 'A_SPosAttack 617 0 0) ; S_SPID_ATK2
-     (make-state 45 32775 4 'A_SPosAttack 618 0 0) ; S_SPID_ATK3
-     (make-state 45 32775 1 'A_SpidRefire 616 0 0) ; S_SPID_ATK4
-     (make-state 45 8 3 #f 620 0 0) ; S_SPID_PAIN
-     (make-state 45 8 3 'A_Pain 603 0 0) ; S_SPID_PAIN2
-     (make-state 45 9 20 'A_Scream 622 0 0) ; S_SPID_DIE1
-     (make-state 45 10 10 'A_Fall 623 0 0) ; S_SPID_DIE2
-     (make-state 45 11 10 #f 624 0 0) ; S_SPID_DIE3
-     (make-state 45 12 10 #f 625 0 0) ; S_SPID_DIE4
-     (make-state 45 13 10 #f 626 0 0) ; S_SPID_DIE5
-     (make-state 45 14 10 #f 627 0 0) ; S_SPID_DIE6
-     (make-state 45 15 10 #f 628 0 0) ; S_SPID_DIE7
-     (make-state 45 16 10 #f 629 0 0) ; S_SPID_DIE8
-     (make-state 45 17 10 #f 630 0 0) ; S_SPID_DIE9
-     (make-state 45 18 30 #f 631 0 0) ; S_SPID_DIE10
-     (make-state 45 18 -1 'A_BossDeath 0 0 0) ; S_SPID_DIE11
-     (make-state 46 0 10 'A_Look 633 0 0) ; S_BSPI_STND
-     (make-state 46 1 10 'A_Look 632 0 0) ; S_BSPI_STND2
-     (make-state 46 0 20 #f 635 0 0) ; S_BSPI_SIGHT
-     (make-state 46 0 3 'A_BabyMetal 636 0 0) ; S_BSPI_RUN1
-     (make-state 46 0 3 'A_Chase 637 0 0) ; S_BSPI_RUN2
-     (make-state 46 1 3 'A_Chase 638 0 0) ; S_BSPI_RUN3
-     (make-state 46 1 3 'A_Chase 639 0 0) ; S_BSPI_RUN4
-     (make-state 46 2 3 'A_Chase 640 0 0) ; S_BSPI_RUN5
-     (make-state 46 2 3 'A_Chase 641 0 0) ; S_BSPI_RUN6
-     (make-state 46 3 3 'A_BabyMetal 642 0 0) ; S_BSPI_RUN7
-     (make-state 46 3 3 'A_Chase 643 0 0) ; S_BSPI_RUN8
-     (make-state 46 4 3 'A_Chase 644 0 0) ; S_BSPI_RUN9
-     (make-state 46 4 3 'A_Chase 645 0 0) ; S_BSPI_RUN10
-     (make-state 46 5 3 'A_Chase 646 0 0) ; S_BSPI_RUN11
-     (make-state 46 5 3 'A_Chase 635 0 0) ; S_BSPI_RUN12
-     (make-state 46 32768 20 'A_FaceTarget 648 0 0) ; S_BSPI_ATK1
-     (make-state 46 32774 4 'A_BspiAttack 649 0 0) ; S_BSPI_ATK2
-     (make-state 46 32775 4 #f 650 0 0) ; S_BSPI_ATK3
-     (make-state 46 32775 1 'A_SpidRefire 648 0 0) ; S_BSPI_ATK4
-     (make-state 46 8 3 #f 652 0 0) ; S_BSPI_PAIN
-     (make-state 46 8 3 'A_Pain 635 0 0) ; S_BSPI_PAIN2
-     (make-state 46 9 20 'A_Scream 654 0 0) ; S_BSPI_DIE1
-     (make-state 46 10 7 'A_Fall 655 0 0) ; S_BSPI_DIE2
-     (make-state 46 11 7 #f 656 0 0) ; S_BSPI_DIE3
-     (make-state 46 12 7 #f 657 0 0) ; S_BSPI_DIE4
-     (make-state 46 13 7 #f 658 0 0) ; S_BSPI_DIE5
-     (make-state 46 14 7 #f 659 0 0) ; S_BSPI_DIE6
-     (make-state 46 15 -1 'A_BossDeath 0 0 0) ; S_BSPI_DIE7
-     (make-state 46 15 5 #f 661 0 0) ; S_BSPI_RAISE1
-     (make-state 46 14 5 #f 662 0 0) ; S_BSPI_RAISE2
-     (make-state 46 13 5 #f 663 0 0) ; S_BSPI_RAISE3
-     (make-state 46 12 5 #f 664 0 0) ; S_BSPI_RAISE4
-     (make-state 46 11 5 #f 665 0 0) ; S_BSPI_RAISE5
-     (make-state 46 10 5 #f 666 0 0) ; S_BSPI_RAISE6
-     (make-state 46 9 5 #f 635 0 0) ; S_BSPI_RAISE7
-     (make-state 47 32768 5 #f 668 0 0) ; S_ARACH_PLAZ
-     (make-state 47 32769 5 #f 667 0 0) ; S_ARACH_PLAZ2
-     (make-state 48 32768 5 #f 670 0 0) ; S_ARACH_PLEX
-     (make-state 48 32769 5 #f 671 0 0) ; S_ARACH_PLEX2
-     (make-state 48 32770 5 #f 672 0 0) ; S_ARACH_PLEX3
-     (make-state 48 32771 5 #f 673 0 0) ; S_ARACH_PLEX4
-     (make-state 48 32772 5 #f 0 0 0) ; S_ARACH_PLEX5
-     (make-state 49 0 10 'A_Look 675 0 0) ; S_CYBER_STND
-     (make-state 49 1 10 'A_Look 674 0 0) ; S_CYBER_STND2
-     (make-state 49 0 3 'A_Hoof 677 0 0) ; S_CYBER_RUN1
-     (make-state 49 0 3 'A_Chase 678 0 0) ; S_CYBER_RUN2
-     (make-state 49 1 3 'A_Chase 679 0 0) ; S_CYBER_RUN3
-     (make-state 49 1 3 'A_Chase 680 0 0) ; S_CYBER_RUN4
-     (make-state 49 2 3 'A_Chase 681 0 0) ; S_CYBER_RUN5
-     (make-state 49 2 3 'A_Chase 682 0 0) ; S_CYBER_RUN6
-     (make-state 49 3 3 'A_Metal 683 0 0) ; S_CYBER_RUN7
-     (make-state 49 3 3 'A_Chase 676 0 0) ; S_CYBER_RUN8
-     (make-state 49 4 6 'A_FaceTarget 685 0 0) ; S_CYBER_ATK1
-     (make-state 49 5 12 'A_CyberAttack 686 0 0) ; S_CYBER_ATK2
-     (make-state 49 4 12 'A_FaceTarget 687 0 0) ; S_CYBER_ATK3
-     (make-state 49 5 12 'A_CyberAttack 688 0 0) ; S_CYBER_ATK4
-     (make-state 49 4 12 'A_FaceTarget 689 0 0) ; S_CYBER_ATK5
-     (make-state 49 5 12 'A_CyberAttack 676 0 0) ; S_CYBER_ATK6
-     (make-state 49 6 10 'A_Pain 676 0 0) ; S_CYBER_PAIN
-     (make-state 49 7 10 #f 692 0 0) ; S_CYBER_DIE1
-     (make-state 49 8 10 'A_Scream 693 0 0) ; S_CYBER_DIE2
-     (make-state 49 9 10 #f 694 0 0) ; S_CYBER_DIE3
-     (make-state 49 10 10 #f 695 0 0) ; S_CYBER_DIE4
-     (make-state 49 11 10 #f 696 0 0) ; S_CYBER_DIE5
-     (make-state 49 12 10 'A_Fall 697 0 0) ; S_CYBER_DIE6
-     (make-state 49 13 10 #f 698 0 0) ; S_CYBER_DIE7
-     (make-state 49 14 10 #f 699 0 0) ; S_CYBER_DIE8
-     (make-state 49 15 30 #f 700 0 0) ; S_CYBER_DIE9
-     (make-state 49 15 -1 'A_BossDeath 0 0 0) ; S_CYBER_DIE10
-     (make-state 50 0 10 'A_Look 701 0 0) ; S_PAIN_STND
-     (make-state 50 0 3 'A_Chase 703 0 0) ; S_PAIN_RUN1
-     (make-state 50 0 3 'A_Chase 704 0 0) ; S_PAIN_RUN2
-     (make-state 50 1 3 'A_Chase 705 0 0) ; S_PAIN_RUN3
-     (make-state 50 1 3 'A_Chase 706 0 0) ; S_PAIN_RUN4
-     (make-state 50 2 3 'A_Chase 707 0 0) ; S_PAIN_RUN5
-     (make-state 50 2 3 'A_Chase 702 0 0) ; S_PAIN_RUN6
-     (make-state 50 3 5 'A_FaceTarget 709 0 0) ; S_PAIN_ATK1
-     (make-state 50 4 5 'A_FaceTarget 710 0 0) ; S_PAIN_ATK2
-     (make-state 50 32773 5 'A_FaceTarget 711 0 0) ; S_PAIN_ATK3
-     (make-state 50 32773 0 'A_PainAttack 702 0 0) ; S_PAIN_ATK4
-     (make-state 50 6 6 #f 713 0 0) ; S_PAIN_PAIN
-     (make-state 50 6 6 'A_Pain 702 0 0) ; S_PAIN_PAIN2
-     (make-state 50 32775 8 #f 715 0 0) ; S_PAIN_DIE1
-     (make-state 50 32776 8 'A_Scream 716 0 0) ; S_PAIN_DIE2
-     (make-state 50 32777 8 #f 717 0 0) ; S_PAIN_DIE3
-     (make-state 50 32778 8 #f 718 0 0) ; S_PAIN_DIE4
-     (make-state 50 32779 8 'A_PainDie 719 0 0) ; S_PAIN_DIE5
-     (make-state 50 32780 8 #f 0 0 0) ; S_PAIN_DIE6
-     (make-state 50 12 8 #f 721 0 0) ; S_PAIN_RAISE1
-     (make-state 50 11 8 #f 722 0 0) ; S_PAIN_RAISE2
-     (make-state 50 10 8 #f 723 0 0) ; S_PAIN_RAISE3
-     (make-state 50 9 8 #f 724 0 0) ; S_PAIN_RAISE4
-     (make-state 50 8 8 #f 725 0 0) ; S_PAIN_RAISE5
-     (make-state 50 7 8 #f 702 0 0) ; S_PAIN_RAISE6
-     (make-state 51 0 10 'A_Look 727 0 0) ; S_SSWV_STND
-     (make-state 51 1 10 'A_Look 726 0 0) ; S_SSWV_STND2
-     (make-state 51 0 3 'A_Chase 729 0 0) ; S_SSWV_RUN1
-     (make-state 51 0 3 'A_Chase 730 0 0) ; S_SSWV_RUN2
-     (make-state 51 1 3 'A_Chase 731 0 0) ; S_SSWV_RUN3
-     (make-state 51 1 3 'A_Chase 732 0 0) ; S_SSWV_RUN4
-     (make-state 51 2 3 'A_Chase 733 0 0) ; S_SSWV_RUN5
-     (make-state 51 2 3 'A_Chase 734 0 0) ; S_SSWV_RUN6
-     (make-state 51 3 3 'A_Chase 735 0 0) ; S_SSWV_RUN7
-     (make-state 51 3 3 'A_Chase 728 0 0) ; S_SSWV_RUN8
-     (make-state 51 4 10 'A_FaceTarget 737 0 0) ; S_SSWV_ATK1
-     (make-state 51 5 10 'A_FaceTarget 738 0 0) ; S_SSWV_ATK2
-     (make-state 51 32774 4 'A_CPosAttack 739 0 0) ; S_SSWV_ATK3
-     (make-state 51 5 6 'A_FaceTarget 740 0 0) ; S_SSWV_ATK4
-     (make-state 51 32774 4 'A_CPosAttack 741 0 0) ; S_SSWV_ATK5
-     (make-state 51 5 1 'A_CPosRefire 737 0 0) ; S_SSWV_ATK6
-     (make-state 51 7 3 #f 743 0 0) ; S_SSWV_PAIN
-     (make-state 51 7 3 'A_Pain 728 0 0) ; S_SSWV_PAIN2
-     (make-state 51 8 5 #f 745 0 0) ; S_SSWV_DIE1
-     (make-state 51 9 5 'A_Scream 746 0 0) ; S_SSWV_DIE2
-     (make-state 51 10 5 'A_Fall 747 0 0) ; S_SSWV_DIE3
-     (make-state 51 11 5 #f 748 0 0) ; S_SSWV_DIE4
-     (make-state 51 12 -1 #f 0 0 0) ; S_SSWV_DIE5
-     (make-state 51 13 5 #f 750 0 0) ; S_SSWV_XDIE1
-     (make-state 51 14 5 'A_XScream 751 0 0) ; S_SSWV_XDIE2
-     (make-state 51 15 5 'A_Fall 752 0 0) ; S_SSWV_XDIE3
-     (make-state 51 16 5 #f 753 0 0) ; S_SSWV_XDIE4
-     (make-state 51 17 5 #f 754 0 0) ; S_SSWV_XDIE5
-     (make-state 51 18 5 #f 755 0 0) ; S_SSWV_XDIE6
-     (make-state 51 19 5 #f 756 0 0) ; S_SSWV_XDIE7
-     (make-state 51 20 5 #f 757 0 0) ; S_SSWV_XDIE8
-     (make-state 51 21 -1 #f 0 0 0) ; S_SSWV_XDIE9
-     (make-state 51 12 5 #f 759 0 0) ; S_SSWV_RAISE1
-     (make-state 51 11 5 #f 760 0 0) ; S_SSWV_RAISE2
-     (make-state 51 10 5 #f 761 0 0) ; S_SSWV_RAISE3
-     (make-state 51 9 5 #f 762 0 0) ; S_SSWV_RAISE4
-     (make-state 51 8 5 #f 728 0 0) ; S_SSWV_RAISE5
-     (make-state 52 0 -1 #f 763 0 0) ; S_KEENSTND
-     (make-state 52 0 6 #f 765 0 0) ; S_COMMKEEN
-     (make-state 52 1 6 #f 766 0 0) ; S_COMMKEEN2
-     (make-state 52 2 6 'A_Scream 767 0 0) ; S_COMMKEEN3
-     (make-state 52 3 6 #f 768 0 0) ; S_COMMKEEN4
-     (make-state 52 4 6 #f 769 0 0) ; S_COMMKEEN5
-     (make-state 52 5 6 #f 770 0 0) ; S_COMMKEEN6
-     (make-state 52 6 6 #f 771 0 0) ; S_COMMKEEN7
-     (make-state 52 7 6 #f 772 0 0) ; S_COMMKEEN8
-     (make-state 52 8 6 #f 773 0 0) ; S_COMMKEEN9
-     (make-state 52 9 6 #f 774 0 0) ; S_COMMKEEN10
-     (make-state 52 10 6 'A_KeenDie 775 0 0) ; S_COMMKEEN11
-     (make-state 52 11 -1 #f 0 0 0) ; S_COMMKEEN12
-     (make-state 52 12 4 #f 777 0 0) ; S_KEENPAIN
-     (make-state 52 12 8 'A_Pain 763 0 0) ; S_KEENPAIN2
-     (make-state 53 0 -1 #f 0 0 0) ; S_BRAIN
-     (make-state 53 1 36 'A_BrainPain 778 0 0) ; S_BRAIN_PAIN
-     (make-state 53 0 100 'A_BrainScream 781 0 0) ; S_BRAIN_DIE1
-     (make-state 53 0 10 #f 782 0 0) ; S_BRAIN_DIE2
-     (make-state 53 0 10 #f 783 0 0) ; S_BRAIN_DIE3
-     (make-state 53 0 -1 'A_BrainDie 0 0 0) ; S_BRAIN_DIE4
-     (make-state 51 0 10 'A_Look 784 0 0) ; S_BRAINEYE
-     (make-state 51 0 181 'A_BrainAwake 786 0 0) ; S_BRAINEYESEE
-     (make-state 51 0 150 'A_BrainSpit 786 0 0) ; S_BRAINEYE1
-     (make-state 54 32768 3 'A_SpawnSound 788 0 0) ; S_SPAWN1
-     (make-state 54 32769 3 'A_SpawnFly 789 0 0) ; S_SPAWN2
-     (make-state 54 32770 3 'A_SpawnFly 790 0 0) ; S_SPAWN3
-     (make-state 54 32771 3 'A_SpawnFly 787 0 0) ; S_SPAWN4
-     (make-state 32 32768 4 'A_Fire 792 0 0) ; S_SPAWNFIRE1
-     (make-state 32 32769 4 'A_Fire 793 0 0) ; S_SPAWNFIRE2
-     (make-state 32 32770 4 'A_Fire 794 0 0) ; S_SPAWNFIRE3
-     (make-state 32 32771 4 'A_Fire 795 0 0) ; S_SPAWNFIRE4
-     (make-state 32 32772 4 'A_Fire 796 0 0) ; S_SPAWNFIRE5
-     (make-state 32 32773 4 'A_Fire 797 0 0) ; S_SPAWNFIRE6
-     (make-state 32 32774 4 'A_Fire 798 0 0) ; S_SPAWNFIRE7
-     (make-state 32 32775 4 'A_Fire 0 0 0) ; S_SPAWNFIRE8
-     (make-state 22 32769 10 #f 800 0 0) ; S_BRAINEXPLODE1
-     (make-state 22 32770 10 #f 801 0 0) ; S_BRAINEXPLODE2
-     (make-state 22 32771 10 'A_BrainExplode 0 0 0) ; S_BRAINEXPLODE3
-     (make-state 55 0 6 #f 803 0 0) ; S_ARM1
-     (make-state 55 32769 7 #f 802 0 0) ; S_ARM1A
-     (make-state 56 0 6 #f 805 0 0) ; S_ARM2
-     (make-state 56 32769 6 #f 804 0 0) ; S_ARM2A
-     (make-state 57 0 6 #f 807 0 0) ; S_BAR1
-     (make-state 57 1 6 #f 806 0 0) ; S_BAR2
-     (make-state 58 32768 5 #f 809 0 0) ; S_BEXP
-     (make-state 58 32769 5 'A_Scream 810 0 0) ; S_BEXP2
-     (make-state 58 32770 5 #f 811 0 0) ; S_BEXP3
-     (make-state 58 32771 10 'A_Explode 812 0 0) ; S_BEXP4
-     (make-state 58 32772 10 #f 0 0 0) ; S_BEXP5
-     (make-state 59 32768 4 #f 814 0 0) ; S_BBAR1
-     (make-state 59 32769 4 #f 815 0 0) ; S_BBAR2
-     (make-state 59 32770 4 #f 813 0 0) ; S_BBAR3
-     (make-state 60 0 6 #f 817 0 0) ; S_BON1
-     (make-state 60 1 6 #f 818 0 0) ; S_BON1A
-     (make-state 60 2 6 #f 819 0 0) ; S_BON1B
-     (make-state 60 3 6 #f 820 0 0) ; S_BON1C
-     (make-state 60 2 6 #f 821 0 0) ; S_BON1D
-     (make-state 60 1 6 #f 816 0 0) ; S_BON1E
-     (make-state 61 0 6 #f 823 0 0) ; S_BON2
-     (make-state 61 1 6 #f 824 0 0) ; S_BON2A
-     (make-state 61 2 6 #f 825 0 0) ; S_BON2B
-     (make-state 61 3 6 #f 826 0 0) ; S_BON2C
-     (make-state 61 2 6 #f 827 0 0) ; S_BON2D
-     (make-state 61 1 6 #f 822 0 0) ; S_BON2E
-     (make-state 62 0 10 #f 829 0 0) ; S_BKEY
-     (make-state 62 32769 10 #f 828 0 0) ; S_BKEY2
-     (make-state 63 0 10 #f 831 0 0) ; S_RKEY
-     (make-state 63 32769 10 #f 830 0 0) ; S_RKEY2
-     (make-state 64 0 10 #f 833 0 0) ; S_YKEY
-     (make-state 64 32769 10 #f 832 0 0) ; S_YKEY2
-     (make-state 65 0 10 #f 835 0 0) ; S_BSKULL
-     (make-state 65 32769 10 #f 834 0 0) ; S_BSKULL2
-     (make-state 66 0 10 #f 837 0 0) ; S_RSKULL
-     (make-state 66 32769 10 #f 836 0 0) ; S_RSKULL2
-     (make-state 67 0 10 #f 839 0 0) ; S_YSKULL
-     (make-state 67 32769 10 #f 838 0 0) ; S_YSKULL2
-     (make-state 68 0 -1 #f 0 0 0) ; S_STIM
-     (make-state 69 0 -1 #f 0 0 0) ; S_MEDI
-     (make-state 70 32768 6 #f 843 0 0) ; S_SOUL
-     (make-state 70 32769 6 #f 844 0 0) ; S_SOUL2
-     (make-state 70 32770 6 #f 845 0 0) ; S_SOUL3
-     (make-state 70 32771 6 #f 846 0 0) ; S_SOUL4
-     (make-state 70 32770 6 #f 847 0 0) ; S_SOUL5
-     (make-state 70 32769 6 #f 842 0 0) ; S_SOUL6
-     (make-state 71 32768 6 #f 849 0 0) ; S_PINV
-     (make-state 71 32769 6 #f 850 0 0) ; S_PINV2
-     (make-state 71 32770 6 #f 851 0 0) ; S_PINV3
-     (make-state 71 32771 6 #f 848 0 0) ; S_PINV4
-     (make-state 72 32768 -1 #f 0 0 0) ; S_PSTR
-     (make-state 73 32768 6 #f 854 0 0) ; S_PINS
-     (make-state 73 32769 6 #f 855 0 0) ; S_PINS2
-     (make-state 73 32770 6 #f 856 0 0) ; S_PINS3
-     (make-state 73 32771 6 #f 853 0 0) ; S_PINS4
-     (make-state 74 32768 6 #f 858 0 0) ; S_MEGA
-     (make-state 74 32769 6 #f 859 0 0) ; S_MEGA2
-     (make-state 74 32770 6 #f 860 0 0) ; S_MEGA3
-     (make-state 74 32771 6 #f 857 0 0) ; S_MEGA4
-     (make-state 75 32768 -1 #f 0 0 0) ; S_SUIT
-     (make-state 76 32768 6 #f 863 0 0) ; S_PMAP
-     (make-state 76 32769 6 #f 864 0 0) ; S_PMAP2
-     (make-state 76 32770 6 #f 865 0 0) ; S_PMAP3
-     (make-state 76 32771 6 #f 866 0 0) ; S_PMAP4
-     (make-state 76 32770 6 #f 867 0 0) ; S_PMAP5
-     (make-state 76 32769 6 #f 862 0 0) ; S_PMAP6
-     (make-state 77 32768 6 #f 869 0 0) ; S_PVIS
-     (make-state 77 1 6 #f 868 0 0) ; S_PVIS2
-     (make-state 78 0 -1 #f 0 0 0) ; S_CLIP
-     (make-state 79 0 -1 #f 0 0 0) ; S_AMMO
-     (make-state 80 0 -1 #f 0 0 0) ; S_ROCK
-     (make-state 81 0 -1 #f 0 0 0) ; S_BROK
-     (make-state 82 0 -1 #f 0 0 0) ; S_CELL
-     (make-state 83 0 -1 #f 0 0 0) ; S_CELP
-     (make-state 84 0 -1 #f 0 0 0) ; S_SHEL
-     (make-state 85 0 -1 #f 0 0 0) ; S_SBOX
-     (make-state 86 0 -1 #f 0 0 0) ; S_BPAK
-     (make-state 87 0 -1 #f 0 0 0) ; S_BFUG
-     (make-state 88 0 -1 #f 0 0 0) ; S_MGUN
-     (make-state 89 0 -1 #f 0 0 0) ; S_CSAW
-     (make-state 90 0 -1 #f 0 0 0) ; S_LAUN
-     (make-state 91 0 -1 #f 0 0 0) ; S_PLAS
-     (make-state 92 0 -1 #f 0 0 0) ; S_SHOT
-     (make-state 93 0 -1 #f 0 0 0) ; S_SHOT2
-     (make-state 94 32768 -1 #f 0 0 0) ; S_COLU
-     (make-state 95 0 -1 #f 0 0 0) ; S_STALAG
-     (make-state 96 0 10 #f 889 0 0) ; S_BLOODYTWITCH
-     (make-state 96 1 15 #f 890 0 0) ; S_BLOODYTWITCH2
-     (make-state 96 2 8 #f 891 0 0) ; S_BLOODYTWITCH3
-     (make-state 96 1 6 #f 888 0 0) ; S_BLOODYTWITCH4
-     (make-state 28 13 -1 #f 0 0 0) ; S_DEADTORSO
-     (make-state 28 18 -1 #f 0 0 0) ; S_DEADBOTTOM
-     (make-state 97 0 -1 #f 0 0 0) ; S_HEADSONSTICK
-     (make-state 98 0 -1 #f 0 0 0) ; S_GIBS
-     (make-state 99 0 -1 #f 0 0 0) ; S_HEADONASTICK
-     (make-state 100 32768 6 #f 898 0 0) ; S_HEADCANDLES
-     (make-state 100 32769 6 #f 897 0 0) ; S_HEADCANDLES2
-     (make-state 101 0 -1 #f 0 0 0) ; S_DEADSTICK
-     (make-state 102 0 6 #f 901 0 0) ; S_LIVESTICK
-     (make-state 102 1 8 #f 900 0 0) ; S_LIVESTICK2
-     (make-state 103 0 -1 #f 0 0 0) ; S_MEAT2
-     (make-state 104 0 -1 #f 0 0 0) ; S_MEAT3
-     (make-state 105 0 -1 #f 0 0 0) ; S_MEAT4
-     (make-state 106 0 -1 #f 0 0 0) ; S_MEAT5
-     (make-state 107 0 -1 #f 0 0 0) ; S_STALAGTITE
-     (make-state 108 0 -1 #f 0 0 0) ; S_TALLGRNCOL
-     (make-state 109 0 -1 #f 0 0 0) ; S_SHRTGRNCOL
-     (make-state 110 0 -1 #f 0 0 0) ; S_TALLREDCOL
-     (make-state 111 0 -1 #f 0 0 0) ; S_SHRTREDCOL
-     (make-state 112 32768 -1 #f 0 0 0) ; S_CANDLESTIK
-     (make-state 113 32768 -1 #f 0 0 0) ; S_CANDELABRA
-     (make-state 114 0 -1 #f 0 0 0) ; S_SKULLCOL
-     (make-state 115 0 -1 #f 0 0 0) ; S_TORCHTREE
-     (make-state 116 0 -1 #f 0 0 0) ; S_BIGTREE
-     (make-state 117 0 -1 #f 0 0 0) ; S_TECHPILLAR
-     (make-state 118 32768 6 #f 918 0 0) ; S_EVILEYE
-     (make-state 118 32769 6 #f 919 0 0) ; S_EVILEYE2
-     (make-state 118 32770 6 #f 920 0 0) ; S_EVILEYE3
-     (make-state 118 32769 6 #f 917 0 0) ; S_EVILEYE4
-     (make-state 119 32768 6 #f 922 0 0) ; S_FLOATSKULL
-     (make-state 119 32769 6 #f 923 0 0) ; S_FLOATSKULL2
-     (make-state 119 32770 6 #f 921 0 0) ; S_FLOATSKULL3
-     (make-state 120 0 14 #f 925 0 0) ; S_HEARTCOL
-     (make-state 120 1 14 #f 924 0 0) ; S_HEARTCOL2
-     (make-state 121 32768 4 #f 927 0 0) ; S_BLUETORCH
-     (make-state 121 32769 4 #f 928 0 0) ; S_BLUETORCH2
-     (make-state 121 32770 4 #f 929 0 0) ; S_BLUETORCH3
-     (make-state 121 32771 4 #f 926 0 0) ; S_BLUETORCH4
-     (make-state 122 32768 4 #f 931 0 0) ; S_GREENTORCH
-     (make-state 122 32769 4 #f 932 0 0) ; S_GREENTORCH2
-     (make-state 122 32770 4 #f 933 0 0) ; S_GREENTORCH3
-     (make-state 122 32771 4 #f 930 0 0) ; S_GREENTORCH4
-     (make-state 123 32768 4 #f 935 0 0) ; S_REDTORCH
-     (make-state 123 32769 4 #f 936 0 0) ; S_REDTORCH2
-     (make-state 123 32770 4 #f 937 0 0) ; S_REDTORCH3
-     (make-state 123 32771 4 #f 934 0 0) ; S_REDTORCH4
-     (make-state 124 32768 4 #f 939 0 0) ; S_BTORCHSHRT
-     (make-state 124 32769 4 #f 940 0 0) ; S_BTORCHSHRT2
-     (make-state 124 32770 4 #f 941 0 0) ; S_BTORCHSHRT3
-     (make-state 124 32771 4 #f 938 0 0) ; S_BTORCHSHRT4
-     (make-state 125 32768 4 #f 943 0 0) ; S_GTORCHSHRT
-     (make-state 125 32769 4 #f 944 0 0) ; S_GTORCHSHRT2
-     (make-state 125 32770 4 #f 945 0 0) ; S_GTORCHSHRT3
-     (make-state 125 32771 4 #f 942 0 0) ; S_GTORCHSHRT4
-     (make-state 126 32768 4 #f 947 0 0) ; S_RTORCHSHRT
-     (make-state 126 32769 4 #f 948 0 0) ; S_RTORCHSHRT2
-     (make-state 126 32770 4 #f 949 0 0) ; S_RTORCHSHRT3
-     (make-state 126 32771 4 #f 946 0 0) ; S_RTORCHSHRT4
-     (make-state 127 0 -1 #f 0 0 0) ; S_HANGNOGUTS
-     (make-state 128 0 -1 #f 0 0 0) ; S_HANGBNOBRAIN
-     (make-state 129 0 -1 #f 0 0 0) ; S_HANGTLOOKDN
-     (make-state 130 0 -1 #f 0 0 0) ; S_HANGTSKULL
-     (make-state 131 0 -1 #f 0 0 0) ; S_HANGTLOOKUP
-     (make-state 132 0 -1 #f 0 0 0) ; S_HANGTNOBRAIN
-     (make-state 133 0 -1 #f 0 0 0) ; S_COLONGIBS
-     (make-state 134 0 -1 #f 0 0 0) ; S_SMALLPOOL
-     (make-state 135 0 -1 #f 0 0 0) ; S_BRAINSTEM
-     (make-state 136 32768 4 #f 960 0 0) ; S_TECHLAMP
-     (make-state 136 32769 4 #f 961 0 0) ; S_TECHLAMP2
-     (make-state 136 32770 4 #f 962 0 0) ; S_TECHLAMP3
-     (make-state 136 32771 4 #f 959 0 0) ; S_TECHLAMP4
-     (make-state 137 32768 4 #f 964 0 0) ; S_TECH2LAMP
-     (make-state 137 32769 4 #f 965 0 0) ; S_TECH2LAMP2
-     (make-state 137 32770 4 #f 966 0 0) ; S_TECH2LAMP3
-     (make-state 137 32771 4 #f 963 0 0) ; S_TECH2LAMP4
+     (make-state 0 0 0 -1 #f 0 0 0) ; S_NULL
+     (make-state 1 1 4 0 'A_Light0 0 0 0) ; S_LIGHTDONE
+     (make-state 2 2 0 1 'A_WeaponReady 2 0 0) ; S_PUNCH
+     (make-state 3 2 0 1 'A_Lower 3 0 0) ; S_PUNCHDOWN
+     (make-state 4 2 0 1 'A_Raise 4 0 0) ; S_PUNCHUP
+     (make-state 5 2 1 4 #f 6 0 0) ; S_PUNCH1
+     (make-state 6 2 2 4 'A_Punch 7 0 0) ; S_PUNCH2
+     (make-state 7 2 3 5 #f 8 0 0) ; S_PUNCH3
+     (make-state 8 2 2 4 #f 9 0 0) ; S_PUNCH4
+     (make-state 9 2 1 5 'A_ReFire 2 0 0) ; S_PUNCH5
+     (make-state 10 3 0 1 'A_WeaponReady 10 0 0) ; S_PISTOL
+     (make-state 11 3 0 1 'A_Lower 11 0 0) ; S_PISTOLDOWN
+     (make-state 12 3 0 1 'A_Raise 12 0 0) ; S_PISTOLUP
+     (make-state 13 3 0 4 #f 14 0 0) ; S_PISTOL1
+     (make-state 14 3 1 6 'A_FirePistol 15 0 0) ; S_PISTOL2
+     (make-state 15 3 2 4 #f 16 0 0) ; S_PISTOL3
+     (make-state 16 3 1 5 'A_ReFire 10 0 0) ; S_PISTOL4
+     (make-state 17 4 32768 7 'A_Light1 1 0 0) ; S_PISTOLFLASH
+     (make-state 18 1 0 1 'A_WeaponReady 18 0 0) ; S_SGUN
+     (make-state 19 1 0 1 'A_Lower 19 0 0) ; S_SGUNDOWN
+     (make-state 20 1 0 1 'A_Raise 20 0 0) ; S_SGUNUP
+     (make-state 21 1 0 3 #f 22 0 0) ; S_SGUN1
+     (make-state 22 1 0 7 'A_FireShotgun 23 0 0) ; S_SGUN2
+     (make-state 23 1 1 5 #f 24 0 0) ; S_SGUN3
+     (make-state 24 1 2 5 #f 25 0 0) ; S_SGUN4
+     (make-state 25 1 3 4 #f 26 0 0) ; S_SGUN5
+     (make-state 26 1 2 5 #f 27 0 0) ; S_SGUN6
+     (make-state 27 1 1 5 #f 28 0 0) ; S_SGUN7
+     (make-state 28 1 0 3 #f 29 0 0) ; S_SGUN8
+     (make-state 29 1 0 7 'A_ReFire 18 0 0) ; S_SGUN9
+     (make-state 30 5 32768 4 'A_Light1 31 0 0) ; S_SGUNFLASH1
+     (make-state 31 5 32769 3 'A_Light2 1 0 0) ; S_SGUNFLASH2
+     (make-state 32 6 0 1 'A_WeaponReady 32 0 0) ; S_DSGUN
+     (make-state 33 6 0 1 'A_Lower 33 0 0) ; S_DSGUNDOWN
+     (make-state 34 6 0 1 'A_Raise 34 0 0) ; S_DSGUNUP
+     (make-state 35 6 0 3 #f 36 0 0) ; S_DSGUN1
+     (make-state 36 6 0 7 'A_FireShotgun2 37 0 0) ; S_DSGUN2
+     (make-state 37 6 1 7 #f 38 0 0) ; S_DSGUN3
+     (make-state 38 6 2 7 'A_CheckReload 39 0 0) ; S_DSGUN4
+     (make-state 39 6 3 7 'A_OpenShotgun2 40 0 0) ; S_DSGUN5
+     (make-state 40 6 4 7 #f 41 0 0) ; S_DSGUN6
+     (make-state 41 6 5 7 'A_LoadShotgun2 42 0 0) ; S_DSGUN7
+     (make-state 42 6 6 6 #f 43 0 0) ; S_DSGUN8
+     (make-state 43 6 7 6 'A_CloseShotgun2 44 0 0) ; S_DSGUN9
+     (make-state 44 6 0 5 'A_ReFire 32 0 0) ; S_DSGUN10
+     (make-state 45 6 1 7 #f 46 0 0) ; S_DSNR1
+     (make-state 46 6 0 3 #f 33 0 0) ; S_DSNR2
+     (make-state 47 6 32776 5 'A_Light1 48 0 0) ; S_DSGUNFLASH1
+     (make-state 48 6 32777 4 'A_Light2 1 0 0) ; S_DSGUNFLASH2
+     (make-state 49 7 0 1 'A_WeaponReady 49 0 0) ; S_CHAIN
+     (make-state 50 7 0 1 'A_Lower 50 0 0) ; S_CHAINDOWN
+     (make-state 51 7 0 1 'A_Raise 51 0 0) ; S_CHAINUP
+     (make-state 52 7 0 4 'A_FireCGun 53 0 0) ; S_CHAIN1
+     (make-state 53 7 1 4 'A_FireCGun 54 0 0) ; S_CHAIN2
+     (make-state 54 7 1 0 'A_ReFire 49 0 0) ; S_CHAIN3
+     (make-state 55 8 32768 5 'A_Light1 1 0 0) ; S_CHAINFLASH1
+     (make-state 56 8 32769 5 'A_Light2 1 0 0) ; S_CHAINFLASH2
+     (make-state 57 9 0 1 'A_WeaponReady 57 0 0) ; S_MISSILE
+     (make-state 58 9 0 1 'A_Lower 58 0 0) ; S_MISSILEDOWN
+     (make-state 59 9 0 1 'A_Raise 59 0 0) ; S_MISSILEUP
+     (make-state 60 9 1 8 'A_GunFlash 61 0 0) ; S_MISSILE1
+     (make-state 61 9 1 12 'A_FireMissile 62 0 0) ; S_MISSILE2
+     (make-state 62 9 1 0 'A_ReFire 57 0 0) ; S_MISSILE3
+     (make-state 63 10 32768 3 'A_Light1 64 0 0) ; S_MISSILEFLASH1
+     (make-state 64 10 32769 4 #f 65 0 0) ; S_MISSILEFLASH2
+     (make-state 65 10 32770 4 'A_Light2 66 0 0) ; S_MISSILEFLASH3
+     (make-state 66 10 32771 4 'A_Light2 1 0 0) ; S_MISSILEFLASH4
+     (make-state 67 11 2 4 'A_WeaponReady 68 0 0) ; S_SAW
+     (make-state 68 11 3 4 'A_WeaponReady 67 0 0) ; S_SAWB
+     (make-state 69 11 2 1 'A_Lower 69 0 0) ; S_SAWDOWN
+     (make-state 70 11 2 1 'A_Raise 70 0 0) ; S_SAWUP
+     (make-state 71 11 0 4 'A_Saw 72 0 0) ; S_SAW1
+     (make-state 72 11 1 4 'A_Saw 73 0 0) ; S_SAW2
+     (make-state 73 11 1 0 'A_ReFire 67 0 0) ; S_SAW3
+     (make-state 74 12 0 1 'A_WeaponReady 74 0 0) ; S_PLASMA
+     (make-state 75 12 0 1 'A_Lower 75 0 0) ; S_PLASMADOWN
+     (make-state 76 12 0 1 'A_Raise 76 0 0) ; S_PLASMAUP
+     (make-state 77 12 0 3 'A_FirePlasma 78 0 0) ; S_PLASMA1
+     (make-state 78 12 1 20 'A_ReFire 74 0 0) ; S_PLASMA2
+     (make-state 79 13 32768 4 'A_Light1 1 0 0) ; S_PLASMAFLASH1
+     (make-state 80 13 32769 4 'A_Light1 1 0 0) ; S_PLASMAFLASH2
+     (make-state 81 14 0 1 'A_WeaponReady 81 0 0) ; S_BFG
+     (make-state 82 14 0 1 'A_Lower 82 0 0) ; S_BFGDOWN
+     (make-state 83 14 0 1 'A_Raise 83 0 0) ; S_BFGUP
+     (make-state 84 14 0 20 'A_BFGsound 85 0 0) ; S_BFG1
+     (make-state 85 14 1 10 'A_GunFlash 86 0 0) ; S_BFG2
+     (make-state 86 14 1 10 'A_FireBFG 87 0 0) ; S_BFG3
+     (make-state 87 14 1 20 'A_ReFire 81 0 0) ; S_BFG4
+     (make-state 88 15 32768 11 'A_Light1 89 0 0) ; S_BFGFLASH1
+     (make-state 89 15 32769 6 'A_Light2 1 0 0) ; S_BFGFLASH2
+     (make-state 90 16 2 8 #f 91 0 0) ; S_BLOOD1
+     (make-state 91 16 1 8 #f 92 0 0) ; S_BLOOD2
+     (make-state 92 16 0 8 #f 0 0 0) ; S_BLOOD3
+     (make-state 93 17 32768 4 #f 94 0 0) ; S_PUFF1
+     (make-state 94 17 1 4 #f 95 0 0) ; S_PUFF2
+     (make-state 95 17 2 4 #f 96 0 0) ; S_PUFF3
+     (make-state 96 17 3 4 #f 0 0 0) ; S_PUFF4
+     (make-state 97 18 32768 4 #f 98 0 0) ; S_TBALL1
+     (make-state 98 18 32769 4 #f 97 0 0) ; S_TBALL2
+     (make-state 99 18 32770 6 #f 100 0 0) ; S_TBALLX1
+     (make-state 100 18 32771 6 #f 101 0 0) ; S_TBALLX2
+     (make-state 101 18 32772 6 #f 0 0 0) ; S_TBALLX3
+     (make-state 102 19 32768 4 #f 103 0 0) ; S_RBALL1
+     (make-state 103 19 32769 4 #f 102 0 0) ; S_RBALL2
+     (make-state 104 19 32770 6 #f 105 0 0) ; S_RBALLX1
+     (make-state 105 19 32771 6 #f 106 0 0) ; S_RBALLX2
+     (make-state 106 19 32772 6 #f 0 0 0) ; S_RBALLX3
+     (make-state 107 20 32768 6 #f 108 0 0) ; S_PLASBALL
+     (make-state 108 20 32769 6 #f 107 0 0) ; S_PLASBALL2
+     (make-state 109 21 32768 4 #f 110 0 0) ; S_PLASEXP
+     (make-state 110 21 32769 4 #f 111 0 0) ; S_PLASEXP2
+     (make-state 111 21 32770 4 #f 112 0 0) ; S_PLASEXP3
+     (make-state 112 21 32771 4 #f 113 0 0) ; S_PLASEXP4
+     (make-state 113 21 32772 4 #f 0 0 0) ; S_PLASEXP5
+     (make-state 114 22 32768 1 #f 114 0 0) ; S_ROCKET
+     (make-state 115 23 32768 4 #f 116 0 0) ; S_BFGSHOT
+     (make-state 116 23 32769 4 #f 115 0 0) ; S_BFGSHOT2
+     (make-state 117 24 32768 8 #f 118 0 0) ; S_BFGLAND
+     (make-state 118 24 32769 8 #f 119 0 0) ; S_BFGLAND2
+     (make-state 119 24 32770 8 'A_BFGSpray 120 0 0) ; S_BFGLAND3
+     (make-state 120 24 32771 8 #f 121 0 0) ; S_BFGLAND4
+     (make-state 121 24 32772 8 #f 122 0 0) ; S_BFGLAND5
+     (make-state 122 24 32773 8 #f 0 0 0) ; S_BFGLAND6
+     (make-state 123 25 32768 8 #f 124 0 0) ; S_BFGEXP
+     (make-state 124 25 32769 8 #f 125 0 0) ; S_BFGEXP2
+     (make-state 125 25 32770 8 #f 126 0 0) ; S_BFGEXP3
+     (make-state 126 25 32771 8 #f 0 0 0) ; S_BFGEXP4
+     (make-state 127 22 32769 8 'A_Explode 128 0 0) ; S_EXPLODE1
+     (make-state 128 22 32770 6 #f 129 0 0) ; S_EXPLODE2
+     (make-state 129 22 32771 4 #f 0 0 0) ; S_EXPLODE3
+     (make-state 130 26 32768 6 #f 131 0 0) ; S_TFOG
+     (make-state 131 26 32769 6 #f 132 0 0) ; S_TFOG01
+     (make-state 132 26 32768 6 #f 133 0 0) ; S_TFOG02
+     (make-state 133 26 32769 6 #f 134 0 0) ; S_TFOG2
+     (make-state 134 26 32770 6 #f 135 0 0) ; S_TFOG3
+     (make-state 135 26 32771 6 #f 136 0 0) ; S_TFOG4
+     (make-state 136 26 32772 6 #f 137 0 0) ; S_TFOG5
+     (make-state 137 26 32773 6 #f 138 0 0) ; S_TFOG6
+     (make-state 138 26 32774 6 #f 139 0 0) ; S_TFOG7
+     (make-state 139 26 32775 6 #f 140 0 0) ; S_TFOG8
+     (make-state 140 26 32776 6 #f 141 0 0) ; S_TFOG9
+     (make-state 141 26 32777 6 #f 0 0 0) ; S_TFOG10
+     (make-state 142 27 32768 6 #f 143 0 0) ; S_IFOG
+     (make-state 143 27 32769 6 #f 144 0 0) ; S_IFOG01
+     (make-state 144 27 32768 6 #f 145 0 0) ; S_IFOG02
+     (make-state 145 27 32769 6 #f 146 0 0) ; S_IFOG2
+     (make-state 146 27 32770 6 #f 147 0 0) ; S_IFOG3
+     (make-state 147 27 32771 6 #f 148 0 0) ; S_IFOG4
+     (make-state 148 27 32772 6 #f 0 0 0) ; S_IFOG5
+     (make-state 149 28 0 -1 #f 0 0 0) ; S_PLAY
+     (make-state 150 28 0 4 #f 151 0 0) ; S_PLAY_RUN1
+     (make-state 151 28 1 4 #f 152 0 0) ; S_PLAY_RUN2
+     (make-state 152 28 2 4 #f 153 0 0) ; S_PLAY_RUN3
+     (make-state 153 28 3 4 #f 150 0 0) ; S_PLAY_RUN4
+     (make-state 154 28 4 12 #f 149 0 0) ; S_PLAY_ATK1
+     (make-state 155 28 32773 6 #f 154 0 0) ; S_PLAY_ATK2
+     (make-state 156 28 6 4 #f 157 0 0) ; S_PLAY_PAIN
+     (make-state 157 28 6 4 'A_Pain 149 0 0) ; S_PLAY_PAIN2
+     (make-state 158 28 7 10 #f 159 0 0) ; S_PLAY_DIE1
+     (make-state 159 28 8 10 'A_PlayerScream 160 0 0) ; S_PLAY_DIE2
+     (make-state 160 28 9 10 'A_Fall 161 0 0) ; S_PLAY_DIE3
+     (make-state 161 28 10 10 #f 162 0 0) ; S_PLAY_DIE4
+     (make-state 162 28 11 10 #f 163 0 0) ; S_PLAY_DIE5
+     (make-state 163 28 12 10 #f 164 0 0) ; S_PLAY_DIE6
+     (make-state 164 28 13 -1 #f 0 0 0) ; S_PLAY_DIE7
+     (make-state 165 28 14 5 #f 166 0 0) ; S_PLAY_XDIE1
+     (make-state 166 28 15 5 'A_XScream 167 0 0) ; S_PLAY_XDIE2
+     (make-state 167 28 16 5 'A_Fall 168 0 0) ; S_PLAY_XDIE3
+     (make-state 168 28 17 5 #f 169 0 0) ; S_PLAY_XDIE4
+     (make-state 169 28 18 5 #f 170 0 0) ; S_PLAY_XDIE5
+     (make-state 170 28 19 5 #f 171 0 0) ; S_PLAY_XDIE6
+     (make-state 171 28 20 5 #f 172 0 0) ; S_PLAY_XDIE7
+     (make-state 172 28 21 5 #f 173 0 0) ; S_PLAY_XDIE8
+     (make-state 173 28 22 -1 #f 0 0 0) ; S_PLAY_XDIE9
+     (make-state 174 29 0 10 'A_Look 175 0 0) ; S_POSS_STND
+     (make-state 175 29 1 10 'A_Look 174 0 0) ; S_POSS_STND2
+     (make-state 176 29 0 4 'A_Chase 177 0 0) ; S_POSS_RUN1
+     (make-state 177 29 0 4 'A_Chase 178 0 0) ; S_POSS_RUN2
+     (make-state 178 29 1 4 'A_Chase 179 0 0) ; S_POSS_RUN3
+     (make-state 179 29 1 4 'A_Chase 180 0 0) ; S_POSS_RUN4
+     (make-state 180 29 2 4 'A_Chase 181 0 0) ; S_POSS_RUN5
+     (make-state 181 29 2 4 'A_Chase 182 0 0) ; S_POSS_RUN6
+     (make-state 182 29 3 4 'A_Chase 183 0 0) ; S_POSS_RUN7
+     (make-state 183 29 3 4 'A_Chase 176 0 0) ; S_POSS_RUN8
+     (make-state 184 29 4 10 'A_FaceTarget 185 0 0) ; S_POSS_ATK1
+     (make-state 185 29 5 8 'A_PosAttack 186 0 0) ; S_POSS_ATK2
+     (make-state 186 29 4 8 #f 176 0 0) ; S_POSS_ATK3
+     (make-state 187 29 6 3 #f 188 0 0) ; S_POSS_PAIN
+     (make-state 188 29 6 3 'A_Pain 176 0 0) ; S_POSS_PAIN2
+     (make-state 189 29 7 5 #f 190 0 0) ; S_POSS_DIE1
+     (make-state 190 29 8 5 'A_Scream 191 0 0) ; S_POSS_DIE2
+     (make-state 191 29 9 5 'A_Fall 192 0 0) ; S_POSS_DIE3
+     (make-state 192 29 10 5 #f 193 0 0) ; S_POSS_DIE4
+     (make-state 193 29 11 -1 #f 0 0 0) ; S_POSS_DIE5
+     (make-state 194 29 12 5 #f 195 0 0) ; S_POSS_XDIE1
+     (make-state 195 29 13 5 'A_XScream 196 0 0) ; S_POSS_XDIE2
+     (make-state 196 29 14 5 'A_Fall 197 0 0) ; S_POSS_XDIE3
+     (make-state 197 29 15 5 #f 198 0 0) ; S_POSS_XDIE4
+     (make-state 198 29 16 5 #f 199 0 0) ; S_POSS_XDIE5
+     (make-state 199 29 17 5 #f 200 0 0) ; S_POSS_XDIE6
+     (make-state 200 29 18 5 #f 201 0 0) ; S_POSS_XDIE7
+     (make-state 201 29 19 5 #f 202 0 0) ; S_POSS_XDIE8
+     (make-state 202 29 20 -1 #f 0 0 0) ; S_POSS_XDIE9
+     (make-state 203 29 10 5 #f 204 0 0) ; S_POSS_RAISE1
+     (make-state 204 29 9 5 #f 205 0 0) ; S_POSS_RAISE2
+     (make-state 205 29 8 5 #f 206 0 0) ; S_POSS_RAISE3
+     (make-state 206 29 7 5 #f 176 0 0) ; S_POSS_RAISE4
+     (make-state 207 30 0 10 'A_Look 208 0 0) ; S_SPOS_STND
+     (make-state 208 30 1 10 'A_Look 207 0 0) ; S_SPOS_STND2
+     (make-state 209 30 0 3 'A_Chase 210 0 0) ; S_SPOS_RUN1
+     (make-state 210 30 0 3 'A_Chase 211 0 0) ; S_SPOS_RUN2
+     (make-state 211 30 1 3 'A_Chase 212 0 0) ; S_SPOS_RUN3
+     (make-state 212 30 1 3 'A_Chase 213 0 0) ; S_SPOS_RUN4
+     (make-state 213 30 2 3 'A_Chase 214 0 0) ; S_SPOS_RUN5
+     (make-state 214 30 2 3 'A_Chase 215 0 0) ; S_SPOS_RUN6
+     (make-state 215 30 3 3 'A_Chase 216 0 0) ; S_SPOS_RUN7
+     (make-state 216 30 3 3 'A_Chase 209 0 0) ; S_SPOS_RUN8
+     (make-state 217 30 4 10 'A_FaceTarget 218 0 0) ; S_SPOS_ATK1
+     (make-state 218 30 32773 10 'A_SPosAttack 219 0 0) ; S_SPOS_ATK2
+     (make-state 219 30 4 10 #f 209 0 0) ; S_SPOS_ATK3
+     (make-state 220 30 6 3 #f 221 0 0) ; S_SPOS_PAIN
+     (make-state 221 30 6 3 'A_Pain 209 0 0) ; S_SPOS_PAIN2
+     (make-state 222 30 7 5 #f 223 0 0) ; S_SPOS_DIE1
+     (make-state 223 30 8 5 'A_Scream 224 0 0) ; S_SPOS_DIE2
+     (make-state 224 30 9 5 'A_Fall 225 0 0) ; S_SPOS_DIE3
+     (make-state 225 30 10 5 #f 226 0 0) ; S_SPOS_DIE4
+     (make-state 226 30 11 -1 #f 0 0 0) ; S_SPOS_DIE5
+     (make-state 227 30 12 5 #f 228 0 0) ; S_SPOS_XDIE1
+     (make-state 228 30 13 5 'A_XScream 229 0 0) ; S_SPOS_XDIE2
+     (make-state 229 30 14 5 'A_Fall 230 0 0) ; S_SPOS_XDIE3
+     (make-state 230 30 15 5 #f 231 0 0) ; S_SPOS_XDIE4
+     (make-state 231 30 16 5 #f 232 0 0) ; S_SPOS_XDIE5
+     (make-state 232 30 17 5 #f 233 0 0) ; S_SPOS_XDIE6
+     (make-state 233 30 18 5 #f 234 0 0) ; S_SPOS_XDIE7
+     (make-state 234 30 19 5 #f 235 0 0) ; S_SPOS_XDIE8
+     (make-state 235 30 20 -1 #f 0 0 0) ; S_SPOS_XDIE9
+     (make-state 236 30 11 5 #f 237 0 0) ; S_SPOS_RAISE1
+     (make-state 237 30 10 5 #f 238 0 0) ; S_SPOS_RAISE2
+     (make-state 238 30 9 5 #f 239 0 0) ; S_SPOS_RAISE3
+     (make-state 239 30 8 5 #f 240 0 0) ; S_SPOS_RAISE4
+     (make-state 240 30 7 5 #f 209 0 0) ; S_SPOS_RAISE5
+     (make-state 241 31 0 10 'A_Look 242 0 0) ; S_VILE_STND
+     (make-state 242 31 1 10 'A_Look 241 0 0) ; S_VILE_STND2
+     (make-state 243 31 0 2 'A_VileChase 244 0 0) ; S_VILE_RUN1
+     (make-state 244 31 0 2 'A_VileChase 245 0 0) ; S_VILE_RUN2
+     (make-state 245 31 1 2 'A_VileChase 246 0 0) ; S_VILE_RUN3
+     (make-state 246 31 1 2 'A_VileChase 247 0 0) ; S_VILE_RUN4
+     (make-state 247 31 2 2 'A_VileChase 248 0 0) ; S_VILE_RUN5
+     (make-state 248 31 2 2 'A_VileChase 249 0 0) ; S_VILE_RUN6
+     (make-state 249 31 3 2 'A_VileChase 250 0 0) ; S_VILE_RUN7
+     (make-state 250 31 3 2 'A_VileChase 251 0 0) ; S_VILE_RUN8
+     (make-state 251 31 4 2 'A_VileChase 252 0 0) ; S_VILE_RUN9
+     (make-state 252 31 4 2 'A_VileChase 253 0 0) ; S_VILE_RUN10
+     (make-state 253 31 5 2 'A_VileChase 254 0 0) ; S_VILE_RUN11
+     (make-state 254 31 5 2 'A_VileChase 243 0 0) ; S_VILE_RUN12
+     (make-state 255 31 32774 0 'A_VileStart 256 0 0) ; S_VILE_ATK1
+     (make-state 256 31 32774 10 'A_FaceTarget 257 0 0) ; S_VILE_ATK2
+     (make-state 257 31 32775 8 'A_VileTarget 258 0 0) ; S_VILE_ATK3
+     (make-state 258 31 32776 8 'A_FaceTarget 259 0 0) ; S_VILE_ATK4
+     (make-state 259 31 32777 8 'A_FaceTarget 260 0 0) ; S_VILE_ATK5
+     (make-state 260 31 32778 8 'A_FaceTarget 261 0 0) ; S_VILE_ATK6
+     (make-state 261 31 32779 8 'A_FaceTarget 262 0 0) ; S_VILE_ATK7
+     (make-state 262 31 32780 8 'A_FaceTarget 263 0 0) ; S_VILE_ATK8
+     (make-state 263 31 32781 8 'A_FaceTarget 264 0 0) ; S_VILE_ATK9
+     (make-state 264 31 32782 8 'A_VileAttack 265 0 0) ; S_VILE_ATK10
+     (make-state 265 31 32783 20 #f 243 0 0) ; S_VILE_ATK11
+     (make-state 266 31 32794 10 #f 267 0 0) ; S_VILE_HEAL1
+     (make-state 267 31 32795 10 #f 268 0 0) ; S_VILE_HEAL2
+     (make-state 268 31 32796 10 #f 243 0 0) ; S_VILE_HEAL3
+     (make-state 269 31 16 5 #f 270 0 0) ; S_VILE_PAIN
+     (make-state 270 31 16 5 'A_Pain 243 0 0) ; S_VILE_PAIN2
+     (make-state 271 31 16 7 #f 272 0 0) ; S_VILE_DIE1
+     (make-state 272 31 17 7 'A_Scream 273 0 0) ; S_VILE_DIE2
+     (make-state 273 31 18 7 'A_Fall 274 0 0) ; S_VILE_DIE3
+     (make-state 274 31 19 7 #f 275 0 0) ; S_VILE_DIE4
+     (make-state 275 31 20 7 #f 276 0 0) ; S_VILE_DIE5
+     (make-state 276 31 21 7 #f 277 0 0) ; S_VILE_DIE6
+     (make-state 277 31 22 7 #f 278 0 0) ; S_VILE_DIE7
+     (make-state 278 31 23 5 #f 279 0 0) ; S_VILE_DIE8
+     (make-state 279 31 24 5 #f 280 0 0) ; S_VILE_DIE9
+     (make-state 280 31 25 -1 #f 0 0 0) ; S_VILE_DIE10
+     (make-state 281 32 32768 2 'A_StartFire 282 0 0) ; S_FIRE1
+     (make-state 282 32 32769 2 'A_Fire 283 0 0) ; S_FIRE2
+     (make-state 283 32 32768 2 'A_Fire 284 0 0) ; S_FIRE3
+     (make-state 284 32 32769 2 'A_Fire 285 0 0) ; S_FIRE4
+     (make-state 285 32 32770 2 'A_FireCrackle 286 0 0) ; S_FIRE5
+     (make-state 286 32 32769 2 'A_Fire 287 0 0) ; S_FIRE6
+     (make-state 287 32 32770 2 'A_Fire 288 0 0) ; S_FIRE7
+     (make-state 288 32 32769 2 'A_Fire 289 0 0) ; S_FIRE8
+     (make-state 289 32 32770 2 'A_Fire 290 0 0) ; S_FIRE9
+     (make-state 290 32 32771 2 'A_Fire 291 0 0) ; S_FIRE10
+     (make-state 291 32 32770 2 'A_Fire 292 0 0) ; S_FIRE11
+     (make-state 292 32 32771 2 'A_Fire 293 0 0) ; S_FIRE12
+     (make-state 293 32 32770 2 'A_Fire 294 0 0) ; S_FIRE13
+     (make-state 294 32 32771 2 'A_Fire 295 0 0) ; S_FIRE14
+     (make-state 295 32 32772 2 'A_Fire 296 0 0) ; S_FIRE15
+     (make-state 296 32 32771 2 'A_Fire 297 0 0) ; S_FIRE16
+     (make-state 297 32 32772 2 'A_Fire 298 0 0) ; S_FIRE17
+     (make-state 298 32 32771 2 'A_Fire 299 0 0) ; S_FIRE18
+     (make-state 299 32 32772 2 'A_FireCrackle 300 0 0) ; S_FIRE19
+     (make-state 300 32 32773 2 'A_Fire 301 0 0) ; S_FIRE20
+     (make-state 301 32 32772 2 'A_Fire 302 0 0) ; S_FIRE21
+     (make-state 302 32 32773 2 'A_Fire 303 0 0) ; S_FIRE22
+     (make-state 303 32 32772 2 'A_Fire 304 0 0) ; S_FIRE23
+     (make-state 304 32 32773 2 'A_Fire 305 0 0) ; S_FIRE24
+     (make-state 305 32 32774 2 'A_Fire 306 0 0) ; S_FIRE25
+     (make-state 306 32 32775 2 'A_Fire 307 0 0) ; S_FIRE26
+     (make-state 307 32 32774 2 'A_Fire 308 0 0) ; S_FIRE27
+     (make-state 308 32 32775 2 'A_Fire 309 0 0) ; S_FIRE28
+     (make-state 309 32 32774 2 'A_Fire 310 0 0) ; S_FIRE29
+     (make-state 310 32 32775 2 'A_Fire 0 0 0) ; S_FIRE30
+     (make-state 311 17 1 4 #f 312 0 0) ; S_SMOKE1
+     (make-state 312 17 2 4 #f 313 0 0) ; S_SMOKE2
+     (make-state 313 17 1 4 #f 314 0 0) ; S_SMOKE3
+     (make-state 314 17 2 4 #f 315 0 0) ; S_SMOKE4
+     (make-state 315 17 3 4 #f 0 0 0) ; S_SMOKE5
+     (make-state 316 33 32768 2 'A_Tracer 317 0 0) ; S_TRACER
+     (make-state 317 33 32769 2 'A_Tracer 316 0 0) ; S_TRACER2
+     (make-state 318 34 32768 8 #f 319 0 0) ; S_TRACEEXP1
+     (make-state 319 34 32769 6 #f 320 0 0) ; S_TRACEEXP2
+     (make-state 320 34 32770 4 #f 0 0 0) ; S_TRACEEXP3
+     (make-state 321 35 0 10 'A_Look 322 0 0) ; S_SKEL_STND
+     (make-state 322 35 1 10 'A_Look 321 0 0) ; S_SKEL_STND2
+     (make-state 323 35 0 2 'A_Chase 324 0 0) ; S_SKEL_RUN1
+     (make-state 324 35 0 2 'A_Chase 325 0 0) ; S_SKEL_RUN2
+     (make-state 325 35 1 2 'A_Chase 326 0 0) ; S_SKEL_RUN3
+     (make-state 326 35 1 2 'A_Chase 327 0 0) ; S_SKEL_RUN4
+     (make-state 327 35 2 2 'A_Chase 328 0 0) ; S_SKEL_RUN5
+     (make-state 328 35 2 2 'A_Chase 329 0 0) ; S_SKEL_RUN6
+     (make-state 329 35 3 2 'A_Chase 330 0 0) ; S_SKEL_RUN7
+     (make-state 330 35 3 2 'A_Chase 331 0 0) ; S_SKEL_RUN8
+     (make-state 331 35 4 2 'A_Chase 332 0 0) ; S_SKEL_RUN9
+     (make-state 332 35 4 2 'A_Chase 333 0 0) ; S_SKEL_RUN10
+     (make-state 333 35 5 2 'A_Chase 334 0 0) ; S_SKEL_RUN11
+     (make-state 334 35 5 2 'A_Chase 323 0 0) ; S_SKEL_RUN12
+     (make-state 335 35 6 0 'A_FaceTarget 336 0 0) ; S_SKEL_FIST1
+     (make-state 336 35 6 6 'A_SkelWhoosh 337 0 0) ; S_SKEL_FIST2
+     (make-state 337 35 7 6 'A_FaceTarget 338 0 0) ; S_SKEL_FIST3
+     (make-state 338 35 8 6 'A_SkelFist 323 0 0) ; S_SKEL_FIST4
+     (make-state 339 35 32777 0 'A_FaceTarget 340 0 0) ; S_SKEL_MISS1
+     (make-state 340 35 32777 10 'A_FaceTarget 341 0 0) ; S_SKEL_MISS2
+     (make-state 341 35 10 10 'A_SkelMissile 342 0 0) ; S_SKEL_MISS3
+     (make-state 342 35 10 10 'A_FaceTarget 323 0 0) ; S_SKEL_MISS4
+     (make-state 343 35 11 5 #f 344 0 0) ; S_SKEL_PAIN
+     (make-state 344 35 11 5 'A_Pain 323 0 0) ; S_SKEL_PAIN2
+     (make-state 345 35 11 7 #f 346 0 0) ; S_SKEL_DIE1
+     (make-state 346 35 12 7 #f 347 0 0) ; S_SKEL_DIE2
+     (make-state 347 35 13 7 'A_Scream 348 0 0) ; S_SKEL_DIE3
+     (make-state 348 35 14 7 'A_Fall 349 0 0) ; S_SKEL_DIE4
+     (make-state 349 35 15 7 #f 350 0 0) ; S_SKEL_DIE5
+     (make-state 350 35 16 -1 #f 0 0 0) ; S_SKEL_DIE6
+     (make-state 351 35 16 5 #f 352 0 0) ; S_SKEL_RAISE1
+     (make-state 352 35 15 5 #f 353 0 0) ; S_SKEL_RAISE2
+     (make-state 353 35 14 5 #f 354 0 0) ; S_SKEL_RAISE3
+     (make-state 354 35 13 5 #f 355 0 0) ; S_SKEL_RAISE4
+     (make-state 355 35 12 5 #f 356 0 0) ; S_SKEL_RAISE5
+     (make-state 356 35 11 5 #f 323 0 0) ; S_SKEL_RAISE6
+     (make-state 357 36 32768 4 #f 358 0 0) ; S_FATSHOT1
+     (make-state 358 36 32769 4 #f 357 0 0) ; S_FATSHOT2
+     (make-state 359 22 32769 8 #f 360 0 0) ; S_FATSHOTX1
+     (make-state 360 22 32770 6 #f 361 0 0) ; S_FATSHOTX2
+     (make-state 361 22 32771 4 #f 0 0 0) ; S_FATSHOTX3
+     (make-state 362 37 0 15 'A_Look 363 0 0) ; S_FATT_STND
+     (make-state 363 37 1 15 'A_Look 362 0 0) ; S_FATT_STND2
+     (make-state 364 37 0 4 'A_Chase 365 0 0) ; S_FATT_RUN1
+     (make-state 365 37 0 4 'A_Chase 366 0 0) ; S_FATT_RUN2
+     (make-state 366 37 1 4 'A_Chase 367 0 0) ; S_FATT_RUN3
+     (make-state 367 37 1 4 'A_Chase 368 0 0) ; S_FATT_RUN4
+     (make-state 368 37 2 4 'A_Chase 369 0 0) ; S_FATT_RUN5
+     (make-state 369 37 2 4 'A_Chase 370 0 0) ; S_FATT_RUN6
+     (make-state 370 37 3 4 'A_Chase 371 0 0) ; S_FATT_RUN7
+     (make-state 371 37 3 4 'A_Chase 372 0 0) ; S_FATT_RUN8
+     (make-state 372 37 4 4 'A_Chase 373 0 0) ; S_FATT_RUN9
+     (make-state 373 37 4 4 'A_Chase 374 0 0) ; S_FATT_RUN10
+     (make-state 374 37 5 4 'A_Chase 375 0 0) ; S_FATT_RUN11
+     (make-state 375 37 5 4 'A_Chase 364 0 0) ; S_FATT_RUN12
+     (make-state 376 37 6 20 'A_FatRaise 377 0 0) ; S_FATT_ATK1
+     (make-state 377 37 32775 10 'A_FatAttack1 378 0 0) ; S_FATT_ATK2
+     (make-state 378 37 8 5 'A_FaceTarget 379 0 0) ; S_FATT_ATK3
+     (make-state 379 37 6 5 'A_FaceTarget 380 0 0) ; S_FATT_ATK4
+     (make-state 380 37 32775 10 'A_FatAttack2 381 0 0) ; S_FATT_ATK5
+     (make-state 381 37 8 5 'A_FaceTarget 382 0 0) ; S_FATT_ATK6
+     (make-state 382 37 6 5 'A_FaceTarget 383 0 0) ; S_FATT_ATK7
+     (make-state 383 37 32775 10 'A_FatAttack3 384 0 0) ; S_FATT_ATK8
+     (make-state 384 37 8 5 'A_FaceTarget 385 0 0) ; S_FATT_ATK9
+     (make-state 385 37 6 5 'A_FaceTarget 364 0 0) ; S_FATT_ATK10
+     (make-state 386 37 9 3 #f 387 0 0) ; S_FATT_PAIN
+     (make-state 387 37 9 3 'A_Pain 364 0 0) ; S_FATT_PAIN2
+     (make-state 388 37 10 6 #f 389 0 0) ; S_FATT_DIE1
+     (make-state 389 37 11 6 'A_Scream 390 0 0) ; S_FATT_DIE2
+     (make-state 390 37 12 6 'A_Fall 391 0 0) ; S_FATT_DIE3
+     (make-state 391 37 13 6 #f 392 0 0) ; S_FATT_DIE4
+     (make-state 392 37 14 6 #f 393 0 0) ; S_FATT_DIE5
+     (make-state 393 37 15 6 #f 394 0 0) ; S_FATT_DIE6
+     (make-state 394 37 16 6 #f 395 0 0) ; S_FATT_DIE7
+     (make-state 395 37 17 6 #f 396 0 0) ; S_FATT_DIE8
+     (make-state 396 37 18 6 #f 397 0 0) ; S_FATT_DIE9
+     (make-state 397 37 19 -1 'A_BossDeath 0 0 0) ; S_FATT_DIE10
+     (make-state 398 37 17 5 #f 399 0 0) ; S_FATT_RAISE1
+     (make-state 399 37 16 5 #f 400 0 0) ; S_FATT_RAISE2
+     (make-state 400 37 15 5 #f 401 0 0) ; S_FATT_RAISE3
+     (make-state 401 37 14 5 #f 402 0 0) ; S_FATT_RAISE4
+     (make-state 402 37 13 5 #f 403 0 0) ; S_FATT_RAISE5
+     (make-state 403 37 12 5 #f 404 0 0) ; S_FATT_RAISE6
+     (make-state 404 37 11 5 #f 405 0 0) ; S_FATT_RAISE7
+     (make-state 405 37 10 5 #f 364 0 0) ; S_FATT_RAISE8
+     (make-state 406 38 0 10 'A_Look 407 0 0) ; S_CPOS_STND
+     (make-state 407 38 1 10 'A_Look 406 0 0) ; S_CPOS_STND2
+     (make-state 408 38 0 3 'A_Chase 409 0 0) ; S_CPOS_RUN1
+     (make-state 409 38 0 3 'A_Chase 410 0 0) ; S_CPOS_RUN2
+     (make-state 410 38 1 3 'A_Chase 411 0 0) ; S_CPOS_RUN3
+     (make-state 411 38 1 3 'A_Chase 412 0 0) ; S_CPOS_RUN4
+     (make-state 412 38 2 3 'A_Chase 413 0 0) ; S_CPOS_RUN5
+     (make-state 413 38 2 3 'A_Chase 414 0 0) ; S_CPOS_RUN6
+     (make-state 414 38 3 3 'A_Chase 415 0 0) ; S_CPOS_RUN7
+     (make-state 415 38 3 3 'A_Chase 408 0 0) ; S_CPOS_RUN8
+     (make-state 416 38 4 10 'A_FaceTarget 417 0 0) ; S_CPOS_ATK1
+     (make-state 417 38 32773 4 'A_CPosAttack 418 0 0) ; S_CPOS_ATK2
+     (make-state 418 38 32772 4 'A_CPosAttack 419 0 0) ; S_CPOS_ATK3
+     (make-state 419 38 5 1 'A_CPosRefire 417 0 0) ; S_CPOS_ATK4
+     (make-state 420 38 6 3 #f 421 0 0) ; S_CPOS_PAIN
+     (make-state 421 38 6 3 'A_Pain 408 0 0) ; S_CPOS_PAIN2
+     (make-state 422 38 7 5 #f 423 0 0) ; S_CPOS_DIE1
+     (make-state 423 38 8 5 'A_Scream 424 0 0) ; S_CPOS_DIE2
+     (make-state 424 38 9 5 'A_Fall 425 0 0) ; S_CPOS_DIE3
+     (make-state 425 38 10 5 #f 426 0 0) ; S_CPOS_DIE4
+     (make-state 426 38 11 5 #f 427 0 0) ; S_CPOS_DIE5
+     (make-state 427 38 12 5 #f 428 0 0) ; S_CPOS_DIE6
+     (make-state 428 38 13 -1 #f 0 0 0) ; S_CPOS_DIE7
+     (make-state 429 38 14 5 #f 430 0 0) ; S_CPOS_XDIE1
+     (make-state 430 38 15 5 'A_XScream 431 0 0) ; S_CPOS_XDIE2
+     (make-state 431 38 16 5 'A_Fall 432 0 0) ; S_CPOS_XDIE3
+     (make-state 432 38 17 5 #f 433 0 0) ; S_CPOS_XDIE4
+     (make-state 433 38 18 5 #f 434 0 0) ; S_CPOS_XDIE5
+     (make-state 434 38 19 -1 #f 0 0 0) ; S_CPOS_XDIE6
+     (make-state 435 38 13 5 #f 436 0 0) ; S_CPOS_RAISE1
+     (make-state 436 38 12 5 #f 437 0 0) ; S_CPOS_RAISE2
+     (make-state 437 38 11 5 #f 438 0 0) ; S_CPOS_RAISE3
+     (make-state 438 38 10 5 #f 439 0 0) ; S_CPOS_RAISE4
+     (make-state 439 38 9 5 #f 440 0 0) ; S_CPOS_RAISE5
+     (make-state 440 38 8 5 #f 441 0 0) ; S_CPOS_RAISE6
+     (make-state 441 38 7 5 #f 408 0 0) ; S_CPOS_RAISE7
+     (make-state 442 0 0 10 'A_Look 443 0 0) ; S_TROO_STND
+     (make-state 443 0 1 10 'A_Look 442 0 0) ; S_TROO_STND2
+     (make-state 444 0 0 3 'A_Chase 445 0 0) ; S_TROO_RUN1
+     (make-state 445 0 0 3 'A_Chase 446 0 0) ; S_TROO_RUN2
+     (make-state 446 0 1 3 'A_Chase 447 0 0) ; S_TROO_RUN3
+     (make-state 447 0 1 3 'A_Chase 448 0 0) ; S_TROO_RUN4
+     (make-state 448 0 2 3 'A_Chase 449 0 0) ; S_TROO_RUN5
+     (make-state 449 0 2 3 'A_Chase 450 0 0) ; S_TROO_RUN6
+     (make-state 450 0 3 3 'A_Chase 451 0 0) ; S_TROO_RUN7
+     (make-state 451 0 3 3 'A_Chase 444 0 0) ; S_TROO_RUN8
+     (make-state 452 0 4 8 'A_FaceTarget 453 0 0) ; S_TROO_ATK1
+     (make-state 453 0 5 8 'A_FaceTarget 454 0 0) ; S_TROO_ATK2
+     (make-state 454 0 6 6 'A_TroopAttack 444 0 0) ; S_TROO_ATK3
+     (make-state 455 0 7 2 #f 456 0 0) ; S_TROO_PAIN
+     (make-state 456 0 7 2 'A_Pain 444 0 0) ; S_TROO_PAIN2
+     (make-state 457 0 8 8 #f 458 0 0) ; S_TROO_DIE1
+     (make-state 458 0 9 8 'A_Scream 459 0 0) ; S_TROO_DIE2
+     (make-state 459 0 10 6 #f 460 0 0) ; S_TROO_DIE3
+     (make-state 460 0 11 6 'A_Fall 461 0 0) ; S_TROO_DIE4
+     (make-state 461 0 12 -1 #f 0 0 0) ; S_TROO_DIE5
+     (make-state 462 0 13 5 #f 463 0 0) ; S_TROO_XDIE1
+     (make-state 463 0 14 5 'A_XScream 464 0 0) ; S_TROO_XDIE2
+     (make-state 464 0 15 5 #f 465 0 0) ; S_TROO_XDIE3
+     (make-state 465 0 16 5 'A_Fall 466 0 0) ; S_TROO_XDIE4
+     (make-state 466 0 17 5 #f 467 0 0) ; S_TROO_XDIE5
+     (make-state 467 0 18 5 #f 468 0 0) ; S_TROO_XDIE6
+     (make-state 468 0 19 5 #f 469 0 0) ; S_TROO_XDIE7
+     (make-state 469 0 20 -1 #f 0 0 0) ; S_TROO_XDIE8
+     (make-state 470 0 12 8 #f 471 0 0) ; S_TROO_RAISE1
+     (make-state 471 0 11 8 #f 472 0 0) ; S_TROO_RAISE2
+     (make-state 472 0 10 6 #f 473 0 0) ; S_TROO_RAISE3
+     (make-state 473 0 9 6 #f 474 0 0) ; S_TROO_RAISE4
+     (make-state 474 0 8 6 #f 444 0 0) ; S_TROO_RAISE5
+     (make-state 475 39 0 10 'A_Look 476 0 0) ; S_SARG_STND
+     (make-state 476 39 1 10 'A_Look 475 0 0) ; S_SARG_STND2
+     (make-state 477 39 0 2 'A_Chase 478 0 0) ; S_SARG_RUN1
+     (make-state 478 39 0 2 'A_Chase 479 0 0) ; S_SARG_RUN2
+     (make-state 479 39 1 2 'A_Chase 480 0 0) ; S_SARG_RUN3
+     (make-state 480 39 1 2 'A_Chase 481 0 0) ; S_SARG_RUN4
+     (make-state 481 39 2 2 'A_Chase 482 0 0) ; S_SARG_RUN5
+     (make-state 482 39 2 2 'A_Chase 483 0 0) ; S_SARG_RUN6
+     (make-state 483 39 3 2 'A_Chase 484 0 0) ; S_SARG_RUN7
+     (make-state 484 39 3 2 'A_Chase 477 0 0) ; S_SARG_RUN8
+     (make-state 485 39 4 8 'A_FaceTarget 486 0 0) ; S_SARG_ATK1
+     (make-state 486 39 5 8 'A_FaceTarget 487 0 0) ; S_SARG_ATK2
+     (make-state 487 39 6 8 'A_SargAttack 477 0 0) ; S_SARG_ATK3
+     (make-state 488 39 7 2 #f 489 0 0) ; S_SARG_PAIN
+     (make-state 489 39 7 2 'A_Pain 477 0 0) ; S_SARG_PAIN2
+     (make-state 490 39 8 8 #f 491 0 0) ; S_SARG_DIE1
+     (make-state 491 39 9 8 'A_Scream 492 0 0) ; S_SARG_DIE2
+     (make-state 492 39 10 4 #f 493 0 0) ; S_SARG_DIE3
+     (make-state 493 39 11 4 'A_Fall 494 0 0) ; S_SARG_DIE4
+     (make-state 494 39 12 4 #f 495 0 0) ; S_SARG_DIE5
+     (make-state 495 39 13 -1 #f 0 0 0) ; S_SARG_DIE6
+     (make-state 496 39 13 5 #f 497 0 0) ; S_SARG_RAISE1
+     (make-state 497 39 12 5 #f 498 0 0) ; S_SARG_RAISE2
+     (make-state 498 39 11 5 #f 499 0 0) ; S_SARG_RAISE3
+     (make-state 499 39 10 5 #f 500 0 0) ; S_SARG_RAISE4
+     (make-state 500 39 9 5 #f 501 0 0) ; S_SARG_RAISE5
+     (make-state 501 39 8 5 #f 477 0 0) ; S_SARG_RAISE6
+     (make-state 502 40 0 10 'A_Look 502 0 0) ; S_HEAD_STND
+     (make-state 503 40 0 3 'A_Chase 503 0 0) ; S_HEAD_RUN1
+     (make-state 504 40 1 5 'A_FaceTarget 505 0 0) ; S_HEAD_ATK1
+     (make-state 505 40 2 5 'A_FaceTarget 506 0 0) ; S_HEAD_ATK2
+     (make-state 506 40 32771 5 'A_HeadAttack 503 0 0) ; S_HEAD_ATK3
+     (make-state 507 40 4 3 #f 508 0 0) ; S_HEAD_PAIN
+     (make-state 508 40 4 3 'A_Pain 509 0 0) ; S_HEAD_PAIN2
+     (make-state 509 40 5 6 #f 503 0 0) ; S_HEAD_PAIN3
+     (make-state 510 40 6 8 #f 511 0 0) ; S_HEAD_DIE1
+     (make-state 511 40 7 8 'A_Scream 512 0 0) ; S_HEAD_DIE2
+     (make-state 512 40 8 8 #f 513 0 0) ; S_HEAD_DIE3
+     (make-state 513 40 9 8 #f 514 0 0) ; S_HEAD_DIE4
+     (make-state 514 40 10 8 'A_Fall 515 0 0) ; S_HEAD_DIE5
+     (make-state 515 40 11 -1 #f 0 0 0) ; S_HEAD_DIE6
+     (make-state 516 40 11 8 #f 517 0 0) ; S_HEAD_RAISE1
+     (make-state 517 40 10 8 #f 518 0 0) ; S_HEAD_RAISE2
+     (make-state 518 40 9 8 #f 519 0 0) ; S_HEAD_RAISE3
+     (make-state 519 40 8 8 #f 520 0 0) ; S_HEAD_RAISE4
+     (make-state 520 40 7 8 #f 521 0 0) ; S_HEAD_RAISE5
+     (make-state 521 40 6 8 #f 503 0 0) ; S_HEAD_RAISE6
+     (make-state 522 41 32768 4 #f 523 0 0) ; S_BRBALL1
+     (make-state 523 41 32769 4 #f 522 0 0) ; S_BRBALL2
+     (make-state 524 41 32770 6 #f 525 0 0) ; S_BRBALLX1
+     (make-state 525 41 32771 6 #f 526 0 0) ; S_BRBALLX2
+     (make-state 526 41 32772 6 #f 0 0 0) ; S_BRBALLX3
+     (make-state 527 42 0 10 'A_Look 528 0 0) ; S_BOSS_STND
+     (make-state 528 42 1 10 'A_Look 527 0 0) ; S_BOSS_STND2
+     (make-state 529 42 0 3 'A_Chase 530 0 0) ; S_BOSS_RUN1
+     (make-state 530 42 0 3 'A_Chase 531 0 0) ; S_BOSS_RUN2
+     (make-state 531 42 1 3 'A_Chase 532 0 0) ; S_BOSS_RUN3
+     (make-state 532 42 1 3 'A_Chase 533 0 0) ; S_BOSS_RUN4
+     (make-state 533 42 2 3 'A_Chase 534 0 0) ; S_BOSS_RUN5
+     (make-state 534 42 2 3 'A_Chase 535 0 0) ; S_BOSS_RUN6
+     (make-state 535 42 3 3 'A_Chase 536 0 0) ; S_BOSS_RUN7
+     (make-state 536 42 3 3 'A_Chase 529 0 0) ; S_BOSS_RUN8
+     (make-state 537 42 4 8 'A_FaceTarget 538 0 0) ; S_BOSS_ATK1
+     (make-state 538 42 5 8 'A_FaceTarget 539 0 0) ; S_BOSS_ATK2
+     (make-state 539 42 6 8 'A_BruisAttack 529 0 0) ; S_BOSS_ATK3
+     (make-state 540 42 7 2 #f 541 0 0) ; S_BOSS_PAIN
+     (make-state 541 42 7 2 'A_Pain 529 0 0) ; S_BOSS_PAIN2
+     (make-state 542 42 8 8 #f 543 0 0) ; S_BOSS_DIE1
+     (make-state 543 42 9 8 'A_Scream 544 0 0) ; S_BOSS_DIE2
+     (make-state 544 42 10 8 #f 545 0 0) ; S_BOSS_DIE3
+     (make-state 545 42 11 8 'A_Fall 546 0 0) ; S_BOSS_DIE4
+     (make-state 546 42 12 8 #f 547 0 0) ; S_BOSS_DIE5
+     (make-state 547 42 13 8 #f 548 0 0) ; S_BOSS_DIE6
+     (make-state 548 42 14 -1 'A_BossDeath 0 0 0) ; S_BOSS_DIE7
+     (make-state 549 42 14 8 #f 550 0 0) ; S_BOSS_RAISE1
+     (make-state 550 42 13 8 #f 551 0 0) ; S_BOSS_RAISE2
+     (make-state 551 42 12 8 #f 552 0 0) ; S_BOSS_RAISE3
+     (make-state 552 42 11 8 #f 553 0 0) ; S_BOSS_RAISE4
+     (make-state 553 42 10 8 #f 554 0 0) ; S_BOSS_RAISE5
+     (make-state 554 42 9 8 #f 555 0 0) ; S_BOSS_RAISE6
+     (make-state 555 42 8 8 #f 529 0 0) ; S_BOSS_RAISE7
+     (make-state 556 43 0 10 'A_Look 557 0 0) ; S_BOS2_STND
+     (make-state 557 43 1 10 'A_Look 556 0 0) ; S_BOS2_STND2
+     (make-state 558 43 0 3 'A_Chase 559 0 0) ; S_BOS2_RUN1
+     (make-state 559 43 0 3 'A_Chase 560 0 0) ; S_BOS2_RUN2
+     (make-state 560 43 1 3 'A_Chase 561 0 0) ; S_BOS2_RUN3
+     (make-state 561 43 1 3 'A_Chase 562 0 0) ; S_BOS2_RUN4
+     (make-state 562 43 2 3 'A_Chase 563 0 0) ; S_BOS2_RUN5
+     (make-state 563 43 2 3 'A_Chase 564 0 0) ; S_BOS2_RUN6
+     (make-state 564 43 3 3 'A_Chase 565 0 0) ; S_BOS2_RUN7
+     (make-state 565 43 3 3 'A_Chase 558 0 0) ; S_BOS2_RUN8
+     (make-state 566 43 4 8 'A_FaceTarget 567 0 0) ; S_BOS2_ATK1
+     (make-state 567 43 5 8 'A_FaceTarget 568 0 0) ; S_BOS2_ATK2
+     (make-state 568 43 6 8 'A_BruisAttack 558 0 0) ; S_BOS2_ATK3
+     (make-state 569 43 7 2 #f 570 0 0) ; S_BOS2_PAIN
+     (make-state 570 43 7 2 'A_Pain 558 0 0) ; S_BOS2_PAIN2
+     (make-state 571 43 8 8 #f 572 0 0) ; S_BOS2_DIE1
+     (make-state 572 43 9 8 'A_Scream 573 0 0) ; S_BOS2_DIE2
+     (make-state 573 43 10 8 #f 574 0 0) ; S_BOS2_DIE3
+     (make-state 574 43 11 8 'A_Fall 575 0 0) ; S_BOS2_DIE4
+     (make-state 575 43 12 8 #f 576 0 0) ; S_BOS2_DIE5
+     (make-state 576 43 13 8 #f 577 0 0) ; S_BOS2_DIE6
+     (make-state 577 43 14 -1 #f 0 0 0) ; S_BOS2_DIE7
+     (make-state 578 43 14 8 #f 579 0 0) ; S_BOS2_RAISE1
+     (make-state 579 43 13 8 #f 580 0 0) ; S_BOS2_RAISE2
+     (make-state 580 43 12 8 #f 581 0 0) ; S_BOS2_RAISE3
+     (make-state 581 43 11 8 #f 582 0 0) ; S_BOS2_RAISE4
+     (make-state 582 43 10 8 #f 583 0 0) ; S_BOS2_RAISE5
+     (make-state 583 43 9 8 #f 584 0 0) ; S_BOS2_RAISE6
+     (make-state 584 43 8 8 #f 558 0 0) ; S_BOS2_RAISE7
+     (make-state 585 44 32768 10 'A_Look 586 0 0) ; S_SKULL_STND
+     (make-state 586 44 32769 10 'A_Look 585 0 0) ; S_SKULL_STND2
+     (make-state 587 44 32768 6 'A_Chase 588 0 0) ; S_SKULL_RUN1
+     (make-state 588 44 32769 6 'A_Chase 587 0 0) ; S_SKULL_RUN2
+     (make-state 589 44 32770 10 'A_FaceTarget 590 0 0) ; S_SKULL_ATK1
+     (make-state 590 44 32771 4 'A_SkullAttack 591 0 0) ; S_SKULL_ATK2
+     (make-state 591 44 32770 4 #f 592 0 0) ; S_SKULL_ATK3
+     (make-state 592 44 32771 4 #f 591 0 0) ; S_SKULL_ATK4
+     (make-state 593 44 32772 3 #f 594 0 0) ; S_SKULL_PAIN
+     (make-state 594 44 32772 3 'A_Pain 587 0 0) ; S_SKULL_PAIN2
+     (make-state 595 44 32773 6 #f 596 0 0) ; S_SKULL_DIE1
+     (make-state 596 44 32774 6 'A_Scream 597 0 0) ; S_SKULL_DIE2
+     (make-state 597 44 32775 6 #f 598 0 0) ; S_SKULL_DIE3
+     (make-state 598 44 32776 6 'A_Fall 599 0 0) ; S_SKULL_DIE4
+     (make-state 599 44 9 6 #f 600 0 0) ; S_SKULL_DIE5
+     (make-state 600 44 10 6 #f 0 0 0) ; S_SKULL_DIE6
+     (make-state 601 45 0 10 'A_Look 602 0 0) ; S_SPID_STND
+     (make-state 602 45 1 10 'A_Look 601 0 0) ; S_SPID_STND2
+     (make-state 603 45 0 3 'A_Metal 604 0 0) ; S_SPID_RUN1
+     (make-state 604 45 0 3 'A_Chase 605 0 0) ; S_SPID_RUN2
+     (make-state 605 45 1 3 'A_Chase 606 0 0) ; S_SPID_RUN3
+     (make-state 606 45 1 3 'A_Chase 607 0 0) ; S_SPID_RUN4
+     (make-state 607 45 2 3 'A_Metal 608 0 0) ; S_SPID_RUN5
+     (make-state 608 45 2 3 'A_Chase 609 0 0) ; S_SPID_RUN6
+     (make-state 609 45 3 3 'A_Chase 610 0 0) ; S_SPID_RUN7
+     (make-state 610 45 3 3 'A_Chase 611 0 0) ; S_SPID_RUN8
+     (make-state 611 45 4 3 'A_Metal 612 0 0) ; S_SPID_RUN9
+     (make-state 612 45 4 3 'A_Chase 613 0 0) ; S_SPID_RUN10
+     (make-state 613 45 5 3 'A_Chase 614 0 0) ; S_SPID_RUN11
+     (make-state 614 45 5 3 'A_Chase 603 0 0) ; S_SPID_RUN12
+     (make-state 615 45 32768 20 'A_FaceTarget 616 0 0) ; S_SPID_ATK1
+     (make-state 616 45 32774 4 'A_SPosAttack 617 0 0) ; S_SPID_ATK2
+     (make-state 617 45 32775 4 'A_SPosAttack 618 0 0) ; S_SPID_ATK3
+     (make-state 618 45 32775 1 'A_SpidRefire 616 0 0) ; S_SPID_ATK4
+     (make-state 619 45 8 3 #f 620 0 0) ; S_SPID_PAIN
+     (make-state 620 45 8 3 'A_Pain 603 0 0) ; S_SPID_PAIN2
+     (make-state 621 45 9 20 'A_Scream 622 0 0) ; S_SPID_DIE1
+     (make-state 622 45 10 10 'A_Fall 623 0 0) ; S_SPID_DIE2
+     (make-state 623 45 11 10 #f 624 0 0) ; S_SPID_DIE3
+     (make-state 624 45 12 10 #f 625 0 0) ; S_SPID_DIE4
+     (make-state 625 45 13 10 #f 626 0 0) ; S_SPID_DIE5
+     (make-state 626 45 14 10 #f 627 0 0) ; S_SPID_DIE6
+     (make-state 627 45 15 10 #f 628 0 0) ; S_SPID_DIE7
+     (make-state 628 45 16 10 #f 629 0 0) ; S_SPID_DIE8
+     (make-state 629 45 17 10 #f 630 0 0) ; S_SPID_DIE9
+     (make-state 630 45 18 30 #f 631 0 0) ; S_SPID_DIE10
+     (make-state 631 45 18 -1 'A_BossDeath 0 0 0) ; S_SPID_DIE11
+     (make-state 632 46 0 10 'A_Look 633 0 0) ; S_BSPI_STND
+     (make-state 633 46 1 10 'A_Look 632 0 0) ; S_BSPI_STND2
+     (make-state 634 46 0 20 #f 635 0 0) ; S_BSPI_SIGHT
+     (make-state 635 46 0 3 'A_BabyMetal 636 0 0) ; S_BSPI_RUN1
+     (make-state 636 46 0 3 'A_Chase 637 0 0) ; S_BSPI_RUN2
+     (make-state 637 46 1 3 'A_Chase 638 0 0) ; S_BSPI_RUN3
+     (make-state 638 46 1 3 'A_Chase 639 0 0) ; S_BSPI_RUN4
+     (make-state 639 46 2 3 'A_Chase 640 0 0) ; S_BSPI_RUN5
+     (make-state 640 46 2 3 'A_Chase 641 0 0) ; S_BSPI_RUN6
+     (make-state 641 46 3 3 'A_BabyMetal 642 0 0) ; S_BSPI_RUN7
+     (make-state 642 46 3 3 'A_Chase 643 0 0) ; S_BSPI_RUN8
+     (make-state 643 46 4 3 'A_Chase 644 0 0) ; S_BSPI_RUN9
+     (make-state 644 46 4 3 'A_Chase 645 0 0) ; S_BSPI_RUN10
+     (make-state 645 46 5 3 'A_Chase 646 0 0) ; S_BSPI_RUN11
+     (make-state 646 46 5 3 'A_Chase 635 0 0) ; S_BSPI_RUN12
+     (make-state 647 46 32768 20 'A_FaceTarget 648 0 0) ; S_BSPI_ATK1
+     (make-state 648 46 32774 4 'A_BspiAttack 649 0 0) ; S_BSPI_ATK2
+     (make-state 649 46 32775 4 #f 650 0 0) ; S_BSPI_ATK3
+     (make-state 650 46 32775 1 'A_SpidRefire 648 0 0) ; S_BSPI_ATK4
+     (make-state 651 46 8 3 #f 652 0 0) ; S_BSPI_PAIN
+     (make-state 652 46 8 3 'A_Pain 635 0 0) ; S_BSPI_PAIN2
+     (make-state 653 46 9 20 'A_Scream 654 0 0) ; S_BSPI_DIE1
+     (make-state 654 46 10 7 'A_Fall 655 0 0) ; S_BSPI_DIE2
+     (make-state 655 46 11 7 #f 656 0 0) ; S_BSPI_DIE3
+     (make-state 656 46 12 7 #f 657 0 0) ; S_BSPI_DIE4
+     (make-state 657 46 13 7 #f 658 0 0) ; S_BSPI_DIE5
+     (make-state 658 46 14 7 #f 659 0 0) ; S_BSPI_DIE6
+     (make-state 659 46 15 -1 'A_BossDeath 0 0 0) ; S_BSPI_DIE7
+     (make-state 660 46 15 5 #f 661 0 0) ; S_BSPI_RAISE1
+     (make-state 661 46 14 5 #f 662 0 0) ; S_BSPI_RAISE2
+     (make-state 662 46 13 5 #f 663 0 0) ; S_BSPI_RAISE3
+     (make-state 663 46 12 5 #f 664 0 0) ; S_BSPI_RAISE4
+     (make-state 664 46 11 5 #f 665 0 0) ; S_BSPI_RAISE5
+     (make-state 665 46 10 5 #f 666 0 0) ; S_BSPI_RAISE6
+     (make-state 666 46 9 5 #f 635 0 0) ; S_BSPI_RAISE7
+     (make-state 667 47 32768 5 #f 668 0 0) ; S_ARACH_PLAZ
+     (make-state 668 47 32769 5 #f 667 0 0) ; S_ARACH_PLAZ2
+     (make-state 669 48 32768 5 #f 670 0 0) ; S_ARACH_PLEX
+     (make-state 670 48 32769 5 #f 671 0 0) ; S_ARACH_PLEX2
+     (make-state 671 48 32770 5 #f 672 0 0) ; S_ARACH_PLEX3
+     (make-state 672 48 32771 5 #f 673 0 0) ; S_ARACH_PLEX4
+     (make-state 673 48 32772 5 #f 0 0 0) ; S_ARACH_PLEX5
+     (make-state 674 49 0 10 'A_Look 675 0 0) ; S_CYBER_STND
+     (make-state 675 49 1 10 'A_Look 674 0 0) ; S_CYBER_STND2
+     (make-state 676 49 0 3 'A_Hoof 677 0 0) ; S_CYBER_RUN1
+     (make-state 677 49 0 3 'A_Chase 678 0 0) ; S_CYBER_RUN2
+     (make-state 678 49 1 3 'A_Chase 679 0 0) ; S_CYBER_RUN3
+     (make-state 679 49 1 3 'A_Chase 680 0 0) ; S_CYBER_RUN4
+     (make-state 680 49 2 3 'A_Chase 681 0 0) ; S_CYBER_RUN5
+     (make-state 681 49 2 3 'A_Chase 682 0 0) ; S_CYBER_RUN6
+     (make-state 682 49 3 3 'A_Metal 683 0 0) ; S_CYBER_RUN7
+     (make-state 683 49 3 3 'A_Chase 676 0 0) ; S_CYBER_RUN8
+     (make-state 684 49 4 6 'A_FaceTarget 685 0 0) ; S_CYBER_ATK1
+     (make-state 685 49 5 12 'A_CyberAttack 686 0 0) ; S_CYBER_ATK2
+     (make-state 686 49 4 12 'A_FaceTarget 687 0 0) ; S_CYBER_ATK3
+     (make-state 687 49 5 12 'A_CyberAttack 688 0 0) ; S_CYBER_ATK4
+     (make-state 688 49 4 12 'A_FaceTarget 689 0 0) ; S_CYBER_ATK5
+     (make-state 689 49 5 12 'A_CyberAttack 676 0 0) ; S_CYBER_ATK6
+     (make-state 690 49 6 10 'A_Pain 676 0 0) ; S_CYBER_PAIN
+     (make-state 691 49 7 10 #f 692 0 0) ; S_CYBER_DIE1
+     (make-state 692 49 8 10 'A_Scream 693 0 0) ; S_CYBER_DIE2
+     (make-state 693 49 9 10 #f 694 0 0) ; S_CYBER_DIE3
+     (make-state 694 49 10 10 #f 695 0 0) ; S_CYBER_DIE4
+     (make-state 695 49 11 10 #f 696 0 0) ; S_CYBER_DIE5
+     (make-state 696 49 12 10 'A_Fall 697 0 0) ; S_CYBER_DIE6
+     (make-state 697 49 13 10 #f 698 0 0) ; S_CYBER_DIE7
+     (make-state 698 49 14 10 #f 699 0 0) ; S_CYBER_DIE8
+     (make-state 699 49 15 30 #f 700 0 0) ; S_CYBER_DIE9
+     (make-state 700 49 15 -1 'A_BossDeath 0 0 0) ; S_CYBER_DIE10
+     (make-state 701 50 0 10 'A_Look 701 0 0) ; S_PAIN_STND
+     (make-state 702 50 0 3 'A_Chase 703 0 0) ; S_PAIN_RUN1
+     (make-state 703 50 0 3 'A_Chase 704 0 0) ; S_PAIN_RUN2
+     (make-state 704 50 1 3 'A_Chase 705 0 0) ; S_PAIN_RUN3
+     (make-state 705 50 1 3 'A_Chase 706 0 0) ; S_PAIN_RUN4
+     (make-state 706 50 2 3 'A_Chase 707 0 0) ; S_PAIN_RUN5
+     (make-state 707 50 2 3 'A_Chase 702 0 0) ; S_PAIN_RUN6
+     (make-state 708 50 3 5 'A_FaceTarget 709 0 0) ; S_PAIN_ATK1
+     (make-state 709 50 4 5 'A_FaceTarget 710 0 0) ; S_PAIN_ATK2
+     (make-state 710 50 32773 5 'A_FaceTarget 711 0 0) ; S_PAIN_ATK3
+     (make-state 711 50 32773 0 'A_PainAttack 702 0 0) ; S_PAIN_ATK4
+     (make-state 712 50 6 6 #f 713 0 0) ; S_PAIN_PAIN
+     (make-state 713 50 6 6 'A_Pain 702 0 0) ; S_PAIN_PAIN2
+     (make-state 714 50 32775 8 #f 715 0 0) ; S_PAIN_DIE1
+     (make-state 715 50 32776 8 'A_Scream 716 0 0) ; S_PAIN_DIE2
+     (make-state 716 50 32777 8 #f 717 0 0) ; S_PAIN_DIE3
+     (make-state 717 50 32778 8 #f 718 0 0) ; S_PAIN_DIE4
+     (make-state 718 50 32779 8 'A_PainDie 719 0 0) ; S_PAIN_DIE5
+     (make-state 719 50 32780 8 #f 0 0 0) ; S_PAIN_DIE6
+     (make-state 720 50 12 8 #f 721 0 0) ; S_PAIN_RAISE1
+     (make-state 721 50 11 8 #f 722 0 0) ; S_PAIN_RAISE2
+     (make-state 722 50 10 8 #f 723 0 0) ; S_PAIN_RAISE3
+     (make-state 723 50 9 8 #f 724 0 0) ; S_PAIN_RAISE4
+     (make-state 724 50 8 8 #f 725 0 0) ; S_PAIN_RAISE5
+     (make-state 725 50 7 8 #f 702 0 0) ; S_PAIN_RAISE6
+     (make-state 726 51 0 10 'A_Look 727 0 0) ; S_SSWV_STND
+     (make-state 727 51 1 10 'A_Look 726 0 0) ; S_SSWV_STND2
+     (make-state 728 51 0 3 'A_Chase 729 0 0) ; S_SSWV_RUN1
+     (make-state 729 51 0 3 'A_Chase 730 0 0) ; S_SSWV_RUN2
+     (make-state 730 51 1 3 'A_Chase 731 0 0) ; S_SSWV_RUN3
+     (make-state 731 51 1 3 'A_Chase 732 0 0) ; S_SSWV_RUN4
+     (make-state 732 51 2 3 'A_Chase 733 0 0) ; S_SSWV_RUN5
+     (make-state 733 51 2 3 'A_Chase 734 0 0) ; S_SSWV_RUN6
+     (make-state 734 51 3 3 'A_Chase 735 0 0) ; S_SSWV_RUN7
+     (make-state 735 51 3 3 'A_Chase 728 0 0) ; S_SSWV_RUN8
+     (make-state 736 51 4 10 'A_FaceTarget 737 0 0) ; S_SSWV_ATK1
+     (make-state 737 51 5 10 'A_FaceTarget 738 0 0) ; S_SSWV_ATK2
+     (make-state 738 51 32774 4 'A_CPosAttack 739 0 0) ; S_SSWV_ATK3
+     (make-state 739 51 5 6 'A_FaceTarget 740 0 0) ; S_SSWV_ATK4
+     (make-state 740 51 32774 4 'A_CPosAttack 741 0 0) ; S_SSWV_ATK5
+     (make-state 741 51 5 1 'A_CPosRefire 737 0 0) ; S_SSWV_ATK6
+     (make-state 742 51 7 3 #f 743 0 0) ; S_SSWV_PAIN
+     (make-state 743 51 7 3 'A_Pain 728 0 0) ; S_SSWV_PAIN2
+     (make-state 744 51 8 5 #f 745 0 0) ; S_SSWV_DIE1
+     (make-state 745 51 9 5 'A_Scream 746 0 0) ; S_SSWV_DIE2
+     (make-state 746 51 10 5 'A_Fall 747 0 0) ; S_SSWV_DIE3
+     (make-state 747 51 11 5 #f 748 0 0) ; S_SSWV_DIE4
+     (make-state 748 51 12 -1 #f 0 0 0) ; S_SSWV_DIE5
+     (make-state 749 51 13 5 #f 750 0 0) ; S_SSWV_XDIE1
+     (make-state 750 51 14 5 'A_XScream 751 0 0) ; S_SSWV_XDIE2
+     (make-state 751 51 15 5 'A_Fall 752 0 0) ; S_SSWV_XDIE3
+     (make-state 752 51 16 5 #f 753 0 0) ; S_SSWV_XDIE4
+     (make-state 753 51 17 5 #f 754 0 0) ; S_SSWV_XDIE5
+     (make-state 754 51 18 5 #f 755 0 0) ; S_SSWV_XDIE6
+     (make-state 755 51 19 5 #f 756 0 0) ; S_SSWV_XDIE7
+     (make-state 756 51 20 5 #f 757 0 0) ; S_SSWV_XDIE8
+     (make-state 757 51 21 -1 #f 0 0 0) ; S_SSWV_XDIE9
+     (make-state 758 51 12 5 #f 759 0 0) ; S_SSWV_RAISE1
+     (make-state 759 51 11 5 #f 760 0 0) ; S_SSWV_RAISE2
+     (make-state 760 51 10 5 #f 761 0 0) ; S_SSWV_RAISE3
+     (make-state 761 51 9 5 #f 762 0 0) ; S_SSWV_RAISE4
+     (make-state 762 51 8 5 #f 728 0 0) ; S_SSWV_RAISE5
+     (make-state 763 52 0 -1 #f 763 0 0) ; S_KEENSTND
+     (make-state 764 52 0 6 #f 765 0 0) ; S_COMMKEEN
+     (make-state 765 52 1 6 #f 766 0 0) ; S_COMMKEEN2
+     (make-state 766 52 2 6 'A_Scream 767 0 0) ; S_COMMKEEN3
+     (make-state 767 52 3 6 #f 768 0 0) ; S_COMMKEEN4
+     (make-state 768 52 4 6 #f 769 0 0) ; S_COMMKEEN5
+     (make-state 769 52 5 6 #f 770 0 0) ; S_COMMKEEN6
+     (make-state 770 52 6 6 #f 771 0 0) ; S_COMMKEEN7
+     (make-state 771 52 7 6 #f 772 0 0) ; S_COMMKEEN8
+     (make-state 772 52 8 6 #f 773 0 0) ; S_COMMKEEN9
+     (make-state 773 52 9 6 #f 774 0 0) ; S_COMMKEEN10
+     (make-state 774 52 10 6 'A_KeenDie 775 0 0) ; S_COMMKEEN11
+     (make-state 775 52 11 -1 #f 0 0 0) ; S_COMMKEEN12
+     (make-state 776 52 12 4 #f 777 0 0) ; S_KEENPAIN
+     (make-state 777 52 12 8 'A_Pain 763 0 0) ; S_KEENPAIN2
+     (make-state 778 53 0 -1 #f 0 0 0) ; S_BRAIN
+     (make-state 779 53 1 36 'A_BrainPain 778 0 0) ; S_BRAIN_PAIN
+     (make-state 780 53 0 100 'A_BrainScream 781 0 0) ; S_BRAIN_DIE1
+     (make-state 781 53 0 10 #f 782 0 0) ; S_BRAIN_DIE2
+     (make-state 782 53 0 10 #f 783 0 0) ; S_BRAIN_DIE3
+     (make-state 783 53 0 -1 'A_BrainDie 0 0 0) ; S_BRAIN_DIE4
+     (make-state 784 51 0 10 'A_Look 784 0 0) ; S_BRAINEYE
+     (make-state 785 51 0 181 'A_BrainAwake 786 0 0) ; S_BRAINEYESEE
+     (make-state 786 51 0 150 'A_BrainSpit 786 0 0) ; S_BRAINEYE1
+     (make-state 787 54 32768 3 'A_SpawnSound 788 0 0) ; S_SPAWN1
+     (make-state 788 54 32769 3 'A_SpawnFly 789 0 0) ; S_SPAWN2
+     (make-state 789 54 32770 3 'A_SpawnFly 790 0 0) ; S_SPAWN3
+     (make-state 790 54 32771 3 'A_SpawnFly 787 0 0) ; S_SPAWN4
+     (make-state 791 32 32768 4 'A_Fire 792 0 0) ; S_SPAWNFIRE1
+     (make-state 792 32 32769 4 'A_Fire 793 0 0) ; S_SPAWNFIRE2
+     (make-state 793 32 32770 4 'A_Fire 794 0 0) ; S_SPAWNFIRE3
+     (make-state 794 32 32771 4 'A_Fire 795 0 0) ; S_SPAWNFIRE4
+     (make-state 795 32 32772 4 'A_Fire 796 0 0) ; S_SPAWNFIRE5
+     (make-state 796 32 32773 4 'A_Fire 797 0 0) ; S_SPAWNFIRE6
+     (make-state 797 32 32774 4 'A_Fire 798 0 0) ; S_SPAWNFIRE7
+     (make-state 798 32 32775 4 'A_Fire 0 0 0) ; S_SPAWNFIRE8
+     (make-state 799 22 32769 10 #f 800 0 0) ; S_BRAINEXPLODE1
+     (make-state 800 22 32770 10 #f 801 0 0) ; S_BRAINEXPLODE2
+     (make-state 801 22 32771 10 'A_BrainExplode 0 0 0) ; S_BRAINEXPLODE3
+     (make-state 802 55 0 6 #f 803 0 0) ; S_ARM1
+     (make-state 803 55 32769 7 #f 802 0 0) ; S_ARM1A
+     (make-state 804 56 0 6 #f 805 0 0) ; S_ARM2
+     (make-state 805 56 32769 6 #f 804 0 0) ; S_ARM2A
+     (make-state 806 57 0 6 #f 807 0 0) ; S_BAR1
+     (make-state 807 57 1 6 #f 806 0 0) ; S_BAR2
+     (make-state 808 58 32768 5 #f 809 0 0) ; S_BEXP
+     (make-state 809 58 32769 5 'A_Scream 810 0 0) ; S_BEXP2
+     (make-state 810 58 32770 5 #f 811 0 0) ; S_BEXP3
+     (make-state 811 58 32771 10 'A_Explode 812 0 0) ; S_BEXP4
+     (make-state 812 58 32772 10 #f 0 0 0) ; S_BEXP5
+     (make-state 813 59 32768 4 #f 814 0 0) ; S_BBAR1
+     (make-state 814 59 32769 4 #f 815 0 0) ; S_BBAR2
+     (make-state 815 59 32770 4 #f 813 0 0) ; S_BBAR3
+     (make-state 816 60 0 6 #f 817 0 0) ; S_BON1
+     (make-state 817 60 1 6 #f 818 0 0) ; S_BON1A
+     (make-state 818 60 2 6 #f 819 0 0) ; S_BON1B
+     (make-state 819 60 3 6 #f 820 0 0) ; S_BON1C
+     (make-state 820 60 2 6 #f 821 0 0) ; S_BON1D
+     (make-state 821 60 1 6 #f 816 0 0) ; S_BON1E
+     (make-state 822 61 0 6 #f 823 0 0) ; S_BON2
+     (make-state 823 61 1 6 #f 824 0 0) ; S_BON2A
+     (make-state 824 61 2 6 #f 825 0 0) ; S_BON2B
+     (make-state 825 61 3 6 #f 826 0 0) ; S_BON2C
+     (make-state 826 61 2 6 #f 827 0 0) ; S_BON2D
+     (make-state 827 61 1 6 #f 822 0 0) ; S_BON2E
+     (make-state 828 62 0 10 #f 829 0 0) ; S_BKEY
+     (make-state 829 62 32769 10 #f 828 0 0) ; S_BKEY2
+     (make-state 830 63 0 10 #f 831 0 0) ; S_RKEY
+     (make-state 831 63 32769 10 #f 830 0 0) ; S_RKEY2
+     (make-state 832 64 0 10 #f 833 0 0) ; S_YKEY
+     (make-state 833 64 32769 10 #f 832 0 0) ; S_YKEY2
+     (make-state 834 65 0 10 #f 835 0 0) ; S_BSKULL
+     (make-state 835 65 32769 10 #f 834 0 0) ; S_BSKULL2
+     (make-state 836 66 0 10 #f 837 0 0) ; S_RSKULL
+     (make-state 837 66 32769 10 #f 836 0 0) ; S_RSKULL2
+     (make-state 838 67 0 10 #f 839 0 0) ; S_YSKULL
+     (make-state 839 67 32769 10 #f 838 0 0) ; S_YSKULL2
+     (make-state 840 68 0 -1 #f 0 0 0) ; S_STIM
+     (make-state 841 69 0 -1 #f 0 0 0) ; S_MEDI
+     (make-state 842 70 32768 6 #f 843 0 0) ; S_SOUL
+     (make-state 843 70 32769 6 #f 844 0 0) ; S_SOUL2
+     (make-state 844 70 32770 6 #f 845 0 0) ; S_SOUL3
+     (make-state 845 70 32771 6 #f 846 0 0) ; S_SOUL4
+     (make-state 846 70 32770 6 #f 847 0 0) ; S_SOUL5
+     (make-state 847 70 32769 6 #f 842 0 0) ; S_SOUL6
+     (make-state 848 71 32768 6 #f 849 0 0) ; S_PINV
+     (make-state 849 71 32769 6 #f 850 0 0) ; S_PINV2
+     (make-state 850 71 32770 6 #f 851 0 0) ; S_PINV3
+     (make-state 851 71 32771 6 #f 848 0 0) ; S_PINV4
+     (make-state 852 72 32768 -1 #f 0 0 0) ; S_PSTR
+     (make-state 853 73 32768 6 #f 854 0 0) ; S_PINS
+     (make-state 854 73 32769 6 #f 855 0 0) ; S_PINS2
+     (make-state 855 73 32770 6 #f 856 0 0) ; S_PINS3
+     (make-state 856 73 32771 6 #f 853 0 0) ; S_PINS4
+     (make-state 857 74 32768 6 #f 858 0 0) ; S_MEGA
+     (make-state 858 74 32769 6 #f 859 0 0) ; S_MEGA2
+     (make-state 859 74 32770 6 #f 860 0 0) ; S_MEGA3
+     (make-state 860 74 32771 6 #f 857 0 0) ; S_MEGA4
+     (make-state 861 75 32768 -1 #f 0 0 0) ; S_SUIT
+     (make-state 862 76 32768 6 #f 863 0 0) ; S_PMAP
+     (make-state 863 76 32769 6 #f 864 0 0) ; S_PMAP2
+     (make-state 864 76 32770 6 #f 865 0 0) ; S_PMAP3
+     (make-state 865 76 32771 6 #f 866 0 0) ; S_PMAP4
+     (make-state 866 76 32770 6 #f 867 0 0) ; S_PMAP5
+     (make-state 867 76 32769 6 #f 862 0 0) ; S_PMAP6
+     (make-state 868 77 32768 6 #f 869 0 0) ; S_PVIS
+     (make-state 869 77 1 6 #f 868 0 0) ; S_PVIS2
+     (make-state 870 78 0 -1 #f 0 0 0) ; S_CLIP
+     (make-state 871 79 0 -1 #f 0 0 0) ; S_AMMO
+     (make-state 872 80 0 -1 #f 0 0 0) ; S_ROCK
+     (make-state 873 81 0 -1 #f 0 0 0) ; S_BROK
+     (make-state 874 82 0 -1 #f 0 0 0) ; S_CELL
+     (make-state 875 83 0 -1 #f 0 0 0) ; S_CELP
+     (make-state 876 84 0 -1 #f 0 0 0) ; S_SHEL
+     (make-state 877 85 0 -1 #f 0 0 0) ; S_SBOX
+     (make-state 878 86 0 -1 #f 0 0 0) ; S_BPAK
+     (make-state 879 87 0 -1 #f 0 0 0) ; S_BFUG
+     (make-state 880 88 0 -1 #f 0 0 0) ; S_MGUN
+     (make-state 881 89 0 -1 #f 0 0 0) ; S_CSAW
+     (make-state 882 90 0 -1 #f 0 0 0) ; S_LAUN
+     (make-state 883 91 0 -1 #f 0 0 0) ; S_PLAS
+     (make-state 884 92 0 -1 #f 0 0 0) ; S_SHOT
+     (make-state 885 93 0 -1 #f 0 0 0) ; S_SHOT2
+     (make-state 886 94 32768 -1 #f 0 0 0) ; S_COLU
+     (make-state 887 95 0 -1 #f 0 0 0) ; S_STALAG
+     (make-state 888 96 0 10 #f 889 0 0) ; S_BLOODYTWITCH
+     (make-state 889 96 1 15 #f 890 0 0) ; S_BLOODYTWITCH2
+     (make-state 890 96 2 8 #f 891 0 0) ; S_BLOODYTWITCH3
+     (make-state 891 96 1 6 #f 888 0 0) ; S_BLOODYTWITCH4
+     (make-state 892 28 13 -1 #f 0 0 0) ; S_DEADTORSO
+     (make-state 893 28 18 -1 #f 0 0 0) ; S_DEADBOTTOM
+     (make-state 894 97 0 -1 #f 0 0 0) ; S_HEADSONSTICK
+     (make-state 895 98 0 -1 #f 0 0 0) ; S_GIBS
+     (make-state 896 99 0 -1 #f 0 0 0) ; S_HEADONASTICK
+     (make-state 897 100 32768 6 #f 898 0 0) ; S_HEADCANDLES
+     (make-state 898 100 32769 6 #f 897 0 0) ; S_HEADCANDLES2
+     (make-state 899 101 0 -1 #f 0 0 0) ; S_DEADSTICK
+     (make-state 900 102 0 6 #f 901 0 0) ; S_LIVESTICK
+     (make-state 901 102 1 8 #f 900 0 0) ; S_LIVESTICK2
+     (make-state 902 103 0 -1 #f 0 0 0) ; S_MEAT2
+     (make-state 903 104 0 -1 #f 0 0 0) ; S_MEAT3
+     (make-state 904 105 0 -1 #f 0 0 0) ; S_MEAT4
+     (make-state 905 106 0 -1 #f 0 0 0) ; S_MEAT5
+     (make-state 906 107 0 -1 #f 0 0 0) ; S_STALAGTITE
+     (make-state 907 108 0 -1 #f 0 0 0) ; S_TALLGRNCOL
+     (make-state 908 109 0 -1 #f 0 0 0) ; S_SHRTGRNCOL
+     (make-state 909 110 0 -1 #f 0 0 0) ; S_TALLREDCOL
+     (make-state 910 111 0 -1 #f 0 0 0) ; S_SHRTREDCOL
+     (make-state 911 112 32768 -1 #f 0 0 0) ; S_CANDLESTIK
+     (make-state 912 113 32768 -1 #f 0 0 0) ; S_CANDELABRA
+     (make-state 913 114 0 -1 #f 0 0 0) ; S_SKULLCOL
+     (make-state 914 115 0 -1 #f 0 0 0) ; S_TORCHTREE
+     (make-state 915 116 0 -1 #f 0 0 0) ; S_BIGTREE
+     (make-state 916 117 0 -1 #f 0 0 0) ; S_TECHPILLAR
+     (make-state 917 118 32768 6 #f 918 0 0) ; S_EVILEYE
+     (make-state 918 118 32769 6 #f 919 0 0) ; S_EVILEYE2
+     (make-state 919 118 32770 6 #f 920 0 0) ; S_EVILEYE3
+     (make-state 920 118 32769 6 #f 917 0 0) ; S_EVILEYE4
+     (make-state 921 119 32768 6 #f 922 0 0) ; S_FLOATSKULL
+     (make-state 922 119 32769 6 #f 923 0 0) ; S_FLOATSKULL2
+     (make-state 923 119 32770 6 #f 921 0 0) ; S_FLOATSKULL3
+     (make-state 924 120 0 14 #f 925 0 0) ; S_HEARTCOL
+     (make-state 925 120 1 14 #f 924 0 0) ; S_HEARTCOL2
+     (make-state 926 121 32768 4 #f 927 0 0) ; S_BLUETORCH
+     (make-state 927 121 32769 4 #f 928 0 0) ; S_BLUETORCH2
+     (make-state 928 121 32770 4 #f 929 0 0) ; S_BLUETORCH3
+     (make-state 929 121 32771 4 #f 926 0 0) ; S_BLUETORCH4
+     (make-state 930 122 32768 4 #f 931 0 0) ; S_GREENTORCH
+     (make-state 931 122 32769 4 #f 932 0 0) ; S_GREENTORCH2
+     (make-state 932 122 32770 4 #f 933 0 0) ; S_GREENTORCH3
+     (make-state 933 122 32771 4 #f 930 0 0) ; S_GREENTORCH4
+     (make-state 934 123 32768 4 #f 935 0 0) ; S_REDTORCH
+     (make-state 935 123 32769 4 #f 936 0 0) ; S_REDTORCH2
+     (make-state 936 123 32770 4 #f 937 0 0) ; S_REDTORCH3
+     (make-state 937 123 32771 4 #f 934 0 0) ; S_REDTORCH4
+     (make-state 938 124 32768 4 #f 939 0 0) ; S_BTORCHSHRT
+     (make-state 939 124 32769 4 #f 940 0 0) ; S_BTORCHSHRT2
+     (make-state 940 124 32770 4 #f 941 0 0) ; S_BTORCHSHRT3
+     (make-state 941 124 32771 4 #f 938 0 0) ; S_BTORCHSHRT4
+     (make-state 942 125 32768 4 #f 943 0 0) ; S_GTORCHSHRT
+     (make-state 943 125 32769 4 #f 944 0 0) ; S_GTORCHSHRT2
+     (make-state 944 125 32770 4 #f 945 0 0) ; S_GTORCHSHRT3
+     (make-state 945 125 32771 4 #f 942 0 0) ; S_GTORCHSHRT4
+     (make-state 946 126 32768 4 #f 947 0 0) ; S_RTORCHSHRT
+     (make-state 947 126 32769 4 #f 948 0 0) ; S_RTORCHSHRT2
+     (make-state 948 126 32770 4 #f 949 0 0) ; S_RTORCHSHRT3
+     (make-state 949 126 32771 4 #f 946 0 0) ; S_RTORCHSHRT4
+     (make-state 950 127 0 -1 #f 0 0 0) ; S_HANGNOGUTS
+     (make-state 951 128 0 -1 #f 0 0 0) ; S_HANGBNOBRAIN
+     (make-state 952 129 0 -1 #f 0 0 0) ; S_HANGTLOOKDN
+     (make-state 953 130 0 -1 #f 0 0 0) ; S_HANGTSKULL
+     (make-state 954 131 0 -1 #f 0 0 0) ; S_HANGTLOOKUP
+     (make-state 955 132 0 -1 #f 0 0 0) ; S_HANGTNOBRAIN
+     (make-state 956 133 0 -1 #f 0 0 0) ; S_COLONGIBS
+     (make-state 957 134 0 -1 #f 0 0 0) ; S_SMALLPOOL
+     (make-state 958 135 0 -1 #f 0 0 0) ; S_BRAINSTEM
+     (make-state 959 136 32768 4 #f 960 0 0) ; S_TECHLAMP
+     (make-state 960 136 32769 4 #f 961 0 0) ; S_TECHLAMP2
+     (make-state 961 136 32770 4 #f 962 0 0) ; S_TECHLAMP3
+     (make-state 962 136 32771 4 #f 959 0 0) ; S_TECHLAMP4
+     (make-state 963 137 32768 4 #f 964 0 0) ; S_TECH2LAMP
+     (make-state 964 137 32769 4 #f 965 0 0) ; S_TECH2LAMP2
+     (make-state 965 137 32770 4 #f 966 0 0) ; S_TECH2LAMP3
+     (make-state 966 137 32771 4 #f 963 0 0) ; S_TECH2LAMP4
      ))
 
   (define mobjinfo-table

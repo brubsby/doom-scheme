@@ -40,12 +40,20 @@ build/oracle/cameras/.stamp: wads/doom1.wad tools/oracle/cameras.py
 build/oracle/render/.stamp: build/oracle/doom-oracle build/oracle/cameras/.stamp tools/oracle/render.sh
 	tools/oracle/render.sh build/oracle/cameras build/oracle/render
 
+# Synthetic -nomonsters demos and the oracle's traces of them (tests/sim.ss).
+build/oracle/demos/.stamp: build/oracle/doom-oracle tools/oracle/demos.py tools/oracle/run.sh
+	python3 -I tools/oracle/demos.py build/oracle/demos
+	for f in build/oracle/demos/*.lmp; do n=$$(basename $$f .lmp); \
+	  DEMODIR=build/oracle/demos tools/oracle/run.sh $$n build/oracle/demos/$$n.trace > /dev/null || exit 1; \
+	done
+	touch $@
+
 # Regenerate the info/sounds tables from the C (output is committed).
 info:
 	python3 -I tools/infogen.py reference/doom/linuxdoom-1.10 src/doom
 
 test: wads/doom1.wad build/oracle/fixed-cases.txt build/oracle/tables.txt build/oracle/title.trace \
-      build/oracle/levels/.stamp build/oracle/render/.stamp
+      build/oracle/levels/.stamp build/oracle/render/.stamp build/oracle/demos/.stamp
 	@for t in tests/*.ss; do [ $$t = tests/lib.ss ] && continue; \
 	  echo "== $$t"; scheme --libdirs src --script $$t || exit 1; done
 
