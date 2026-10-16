@@ -1,0 +1,6 @@
+wads/
+*.wad
+*.so
+*.wpo
+*.boot
+build/

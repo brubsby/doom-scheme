@@ -1,0 +1,184 @@
+# doom-scheme — design
+
+A port of id Software's DOOM (linuxdoom-1.10, `reference/doom/`) to Scheme.
+
+## Goals
+
+1. **Vanilla-faithful.** Same fixed-point math, same tables, same RNG, same tic
+   order. The bar is that **the shareware demos (DEMO1–3 in `doom1.wad`) play back
+   in sync.** A demo is a recording of input only, so any divergence in the
+   simulation shows up as the player walking into a wall. That gives us a free,
+   strict end-to-end test.
+2. **Readable against the C.** Every C module maps to one Scheme library with the
+   same name, and every C function maps to a Scheme procedure with a predictable
+   name (below). You should be able to open `p_map.c` and `src/p/map.sls` side by
+   side and follow along.
+3. **Plays at 35 Hz at 320×200.** Native-compiled Scheme should do this
+   comfortably; stretch goal is a higher-res mode later.
+
+Out of scope for now: netplay (IPX/serial), the DOS sound drivers, and the
+sound server process. We keep the `ticcmd_t` architecture because demos need it.
+
+## Implementation: Chez Scheme 10 + SDL2
+
+| Option | Why / why not |
+|---|---|
+| **Chez Scheme (chosen)** | Best native code of any Scheme; unboxed fixnum and flonum ops (`fx+`, `fxsra`, …); bytevectors for framebuffers and lumps; `foreign-procedure` makes SDL2 bindings a few dozen lines with no C glue. R6RS libraries give us real modules. |
+| Guile 3 | JIT is decent, but the hot loops (column and span drawers) would be several times slower. |
+| CHICKEN 5 | Compiles via C, which is fast enough, but it's a heavier toolchain and the FFI is less direct. |
+| Racket CS | Built on Chez, but its runtime adds overhead and a larger surface area. |
+
+The dev environment is a Nix flake (`flake.nix`) that provides `chez` and `SDL2`.
+
+## Layout
+
+```
+reference/doom/          git submodule: id-software/DOOM (read-only)
+src/
+  doom/                  one R6RS library per C module
+    fixed.sls            m_fixed.c   (FixedMul, FixedDiv)
+    tables.sls           tables.c    (generated)
+    info.sls             info.c      (generated: states, mobjinfo, sprnames)
+    random.sls           m_random.c
+    wad.sls              w_wad.c
+    ...
+  i/                     platform layer (replaces i_video/i_sound/i_system/i_net)
+    sdl.sls              raw SDL2 FFI bindings
+    video.sls, sound.sls, system.sls, input.sls
+tools/
+  c2scm.py               converts C data tables (tables.c, info.c, sounds.c) to .sls
+  oracle/                headless C reference build that emits tic traces
+tests/
+wads/                    gitignored; `make wad` fetches doom1.wad (shareware)
+```
+
+### Naming convention
+
+`P_XYDist` → `p-xy-dist`, `R_RenderPlayerView` → `r-render-player-view`,
+`mobj_t` → record `mobj`, field `momx` → accessor `mobj-momx` and mutator
+`mobj-momx-set!`. Constants keep their C spelling in uppercase, e.g. `FRACUNIT`
+and `MF_SOLID`. The C prefix tells you the module.
+
+## Core representation choices
+
+**Integers and wraparound.** Doom relies on 32-bit overflow in two places:
+`angle_t` is an unsigned 32-bit value that wraps constantly, and some
+`fixed_t` (signed 16.16) arithmetic overflows. Chez fixnums are 61-bit, so:
+- Angles: every angle add or subtract goes through `(angle+ a b)`, which applies
+  `(fxand … #xFFFFFFFF)`. A small `angle` library owns this.
+- Fixed point: `fixed-mul` is `(fxsra (* a b) 16)` wrapped to int32.
+  The product of two int32 values can exceed fixnum range, so we use generic
+  `*` there, which handles the rare bignum case correctly. We profile it before
+  doing anything cleverer.
+- `wrap32` gets applied wherever the C silently overflows. We find those places
+  by diffing demo traces, not by guessing.
+
+**FixedDiv caveat.** linuxdoom-1.10's `FixedDiv2` uses `double` division (the
+integer version is `#if 0`'d out). DOS v1.9 used integer division. The two
+disagree in rare low-bit cases, which matters for demo sync against v1.9 demos.
+We implement the integer version; the oracle (below) tells us if that was right.
+
+**Structs → mutable records.** `mobj_t`, `player_t`, `sector_t`, `line_t`,
+`seg_t`, and the others become `define-record-type` with mutable fields. Hot
+render-side data (vertex coordinates, column offsets) may be kept in parallel
+fxvectors instead, if profiling says so.
+
+**Thinkers.** The C code keeps an intrusive doubly-linked list of
+`{prev, next, function}`, where removal sets the function pointer to -1. We keep
+a doubly-linked list of thinker records with a `func` field that holds a
+procedure or `'removed`. Iteration order matters for sync, so we preserve the C
+semantics exactly, including deferred removal.
+
+**State table.** `info.c` holds about 1,000 `state_t` entries whose action
+fields are function pointers (`A_Chase`, `A_FirePistol`, …). The generator emits
+symbols for these, and `info.sls` resolves them to procedures at load time
+through a registry that each `p-*` library populates. That avoids a
+circular-import knot.
+
+**Memory / zone.** `z_zone.c` is dropped and the GC replaces it. Purge tags
+(`PU_LEVEL` and the like) go away, because level data is simply dropped on
+reload. `W_CacheLumpNum` becomes a memoizing lump→bytevector cache.
+
+**Framebuffers.** `screens[0..4]` are 64,000-byte bytevectors of palette
+indices, exactly like the C code. The renderer writes palette indices. The
+platform layer converts to ARGB once per frame through a 256-entry palette
+lookup and uploads to an SDL streaming texture. Gamma and palette flashes
+(damage, pickup) are just a palette swap, as in the original.
+
+**Endianness/parsing.** WAD lumps are read with `bytevector-s16-ref` and related
+procedures using `(endianness little)`, so no `m_swap` is needed.
+
+## Platform layer (SDL2 via Chez FFI)
+
+- **Video:** a window with a 320×200 streaming texture, scaled with aspect
+  correction (4:3).
+- **Input:** SDL events become `event_t` (`ev_keydown`/`ev_keyup`/`ev_mouse`)
+  and get fed to `D_PostEvent`. The key mapping comes from `i_video.c`'s
+  `xlatekey`.
+- **Timing:** `I_GetTime` returns tics at 35 Hz from `SDL_GetTicks`.
+- **Sound:** SFX mixing is done in Scheme (8-bit mono DMX lumps resampled into a
+  stereo mix buffer). The mix is pushed with `SDL_QueueAudio` from the main
+  thread each tic, which avoids audio-thread callbacks into Scheme.
+- **Music:** MUS→MIDI plus a synth is a stretch goal (options: OPL emulation, or
+  hand MIDI to SDL_mixer or FluidSynth).
+
+## Verification: the C oracle
+
+The design's centerpiece is a **headless reference build of the C code** in
+`tools/oracle/`. It is linuxdoom-1.10 with the X11, sound, and network layers
+stubbed out, plus the patches needed to play v1.9 demos:
+- `G_DoPlayDemo` rejects demo version ≠ 110, so we accept 109.
+- `FixedDiv2` gets the integer version.
+
+At the end of each tic it prints a trace line:
+
+```
+tic  prndindex  rndindex  player.x player.y player.z player.angle  health  #mobjs  hash(mobjs)
+```
+
+It can also dump `screens[0]` for chosen tics. The Scheme port emits the
+identical trace. `make sync-test` runs both on DEMO1–3 and reports the **first
+divergent tic** and which field diverged. That turns "the demo desynced
+somewhere" into "on tic 412, `rndindex` differs, so an extra `P_Random` call
+happened". Renderer correctness gets the same treatment by comparing
+framebuffers byte-for-byte on demo tics.
+
+Smaller layers get unit tests against values extracted from C: fixed math,
+`R_PointToAngle`, and `P_AproxDistance`.
+
+## Milestones
+
+Each milestone ends with something visible or testable.
+
+0. **Bootstrap:** flake, SDL window, WAD fetch, oracle builds and traces DEMO1.
+1. **WAD + video:** `w_wad`, `v_video`, and the palette. Draws TITLEPIC and
+   patches. Also `m_fixed`, `m_random`, and the generated `tables`.
+2. **Level load + automap:** `p_setup` and `am_map`. You can see E1M1 as lines.
+3. **Software renderer:** `r_bsp`, `r_segs`, `r_plane`, `r_draw`, `r_sky`,
+   `r_things`, and `r_data` (textures, flats, colormaps). We get a free-look
+   static camera, and framebuffers diff against the oracle.
+4. **Playsim core:** `info` (generated), `p_mobj`, `p_tick`, `p_user`,
+   `p_maputl`, `p_map`, and `p_sight`. You can walk around and collide.
+5. **World and monsters:** `p_spec`, doors, floors, ceilings, plats, lights,
+   switches, teleporters, `p_enemy`, `p_pspr`, `p_inter`. The game is
+   playable.
+6. **Game loop + demos:** `g_game`, `d_main`, ticcmds. **DEMO1–3 stay in sync**
+   (the main correctness gate).
+7. **Front-end:** `st_stuff`, `hu_stuff`, `m_menu`, `wi_stuff`, `f_finale`,
+   `f_wipe`.
+8. **Sound:** `s_sound`, plus the SFX mixer, plus optionally music.
+9. **Saves, config, polish:** `p_saveg`, `m_misc` (default.cfg), cheats,
+   performance work.
+
+Roughly 45k lines of C, about 10k of which is data (`info.c` and `tables.c`) that
+gets generated rather than written.
+
+## Open questions
+
+- Is the target strict DOS v1.9 behavior (demo sync with `doom1.wad`), or
+  linuxdoom-1.10 behavior, bugs and all? This doc assumes v1.9. Chocolate Doom
+  would be the tie-breaker reference for v1.9 semantics, and we could add it as a
+  second submodule if needed.
+- Do we want a higher-resolution or uncapped-framerate mode eventually? If so,
+  `SCREENWIDTH`/`SCREENHEIGHT` should be parameters from day one rather than
+  constants.
