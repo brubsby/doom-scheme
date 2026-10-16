@@ -18,8 +18,17 @@ ORIG    := doomdef doomstat dstrings i_system i_main i_net tables f_finale \
 OURS    := i_video_null i_sound_null oracle
 OBJS    := $(addprefix $(B)/obj/,$(addsuffix .o,$(ORIG) $(OURS)))
 
+all: $(B)/doom-oracle $(B)/fixed_probe $(B)/tables_probe
+
 $(B)/doom-oracle: $(OBJS)
 	$(CC) -o $@ $^ -lm
+
+# Probes: small programs linked against the oracle's own objects that dump
+# reference values for tests/.
+$(B)/fixed_probe: probes/fixed_probe.c $(B)/obj/m_fixed.o
+	$(CC) $(CFLAGS) -o $@ $^
+$(B)/tables_probe: probes/tables_probe.c $(addprefix $(B)/obj/,tables.o m_random.o v_video.o)
+	$(CC) $(CFLAGS) -o $@ $^
 
 # Pristine copy of the reference source + oracle.patch.
 $(B)/src/.patched: oracle.patch
@@ -39,4 +48,4 @@ $(addprefix $(B)/obj/,$(addsuffix .o,$(OURS))): $(B)/obj/%.o: %.c $(B)/src/.patc
 clean:
 	rm -rf $(B)
 
-.PHONY: clean
+.PHONY: all clean

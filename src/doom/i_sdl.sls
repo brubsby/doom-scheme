@@ -1,5 +1,5 @@
 ;;; Minimal SDL2 bindings via Chez's FFI. Only what the platform layer uses.
-(library (i sdl)
+(library (doom i_sdl)
   (export SDL_INIT_VIDEO SDL_INIT_AUDIO SDL_INIT_EVENTS
           SDL_WINDOWPOS_CENTERED SDL_WINDOW_RESIZABLE
           SDL_RENDERER_PRESENTVSYNC SDL_PIXELFORMAT_ARGB8888
@@ -10,6 +10,7 @@
           sdl-create-window sdl-destroy-window sdl-set-hint
           sdl-create-renderer sdl-render-set-logical-size sdl-render-clear
           sdl-render-copy sdl-render-present sdl-render-read-pixels
+          sdl-get-renderer-output-size
           sdl-create-texture sdl-update-texture
           make-sdl-event sdl-poll-event sdl-event-type sdl-event-key-sym
           sdl-event-mouse-xrel sdl-event-mouse-yrel sdl-event-mouse-button)
@@ -52,6 +53,13 @@
   (define sdl-render-present (foreign-procedure "SDL_RenderPresent" (uptr) void))
   (define sdl-render-read-pixels
     (foreign-procedure "SDL_RenderReadPixels" (uptr uptr unsigned-32 u8* int) int))
+  (define %get-output-size
+    (foreign-procedure "SDL_GetRendererOutputSize" (uptr u8* u8*) int))
+  ;; Returns (values width height) in physical pixels.
+  (define (sdl-get-renderer-output-size r)
+    (let ([w (make-bytevector 4 0)] [h (make-bytevector 4 0)])
+      (%get-output-size r w h)
+      (values (bytevector-s32-native-ref w 0) (bytevector-s32-native-ref h 0))))
   (define sdl-create-texture
     (foreign-procedure "SDL_CreateTexture" (uptr unsigned-32 int int int) uptr))
   (define sdl-update-texture

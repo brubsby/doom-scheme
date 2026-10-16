@@ -17,8 +17,8 @@ Where the two disagree on defined behavior, linuxdoom-1.10 wins.
 
 ## Goals
 
-1. **Faithful to linuxdoom-1.10.** Same fixed-point math (including its
-   `double`-based `FixedDiv`), same tables, same RNG, same tic order. The bar is
+1. **Faithful to linuxdoom-1.10.** Same fixed-point math (its
+   `double`-based `FixedDiv` provably equals integer division), same tables, same RNG, same tic order. The bar is
    that **the port's per-tic trace matches the headless linuxdoom-1.10 oracle
    bit-for-bit** while it plays the shareware demos (DEMO1–3 in `doom1.wad`). A
    demo records input only, so any divergence in the simulation shows up
@@ -51,22 +51,22 @@ The dev environment is a Nix flake (`flake.nix`) that provides `chez` and `SDL2`
 ```
 reference/doom/          git submodule: id-software/DOOM — linuxdoom-1.10 is the target
 reference/chocolate-doom/ git submodule: Chocolate Doom 3.1.1 — second reference
-src/
-  doom/                  one R6RS library per C module
-    fixed.sls            m_fixed.c   (FixedMul, FixedDiv)
-    tables.sls           tables.c    (generated)
-    info.sls             info.c      (generated: states, mobjinfo, sprnames)
-    random.sls           m_random.c
-    wad.sls              w_wad.c
-    ...
-  i/                     platform layer (replaces i_video/i_sound/i_system/i_net)
-    sdl.sls              raw SDL2 FFI bindings
-    video.sls, sound.sls, system.sls, input.sls
+src/doom/                one R6RS library per C file, same name: m_fixed.c -> (doom m_fixed)
+  m_fixed.sls w_wad.sls v_video.sls tables.sls m_random.sls m_bbox.sls doomdef.sls ...
+  *_data.sls             GENERATED from the C by tools/c2scm.py (tables, rndtable, gammatable;
+                         later info.c and sounds.c). Committed, never hand-edited.
+  i_video.sls i_system.sls ...  platform layer, same interface as the C i_* files, on SDL2
+  i_sdl.sls              raw SDL2 FFI bindings (no C counterpart)
+  global.sls             define-global (see below)
+  trace.sls              oracle trace format/hashes (no C counterpart)
+src/main.ss              entry point
 tools/
-  c2scm.py               converts C data tables (tables.c, info.c, sounds.c) to .sls
-  oracle/                headless C reference build that emits tic traces
-tests/
-wads/                    gitignored; `make wad` fetches doom1.wad (shareware)
+  c2scm.py               extracts initialized C arrays into a generated library
+  fetch-wad.sh           doom1.wad from id's doom19s.zip
+  oracle/                headless linuxdoom build, trace hook, and probes/ that dump
+                         reference values from the oracle's own objects
+tests/                   `make test`; each test checks against oracle output
+wads/                    gitignored
 ```
 
 ### Naming convention
@@ -74,29 +74,40 @@ wads/                    gitignored; `make wad` fetches doom1.wad (shareware)
 `P_XYDist` → `p-xy-dist`, `R_RenderPlayerView` → `r-render-player-view`,
 `mobj_t` → record `mobj`, field `momx` → accessor `mobj-momx` and mutator
 `mobj-momx-set!`. Constants keep their C spelling in uppercase, e.g. `FRACUNIT`
-and `MF_SOLID`. The C prefix tells you the module.
+and `MF_SOLID`. The C prefix tells you the module, and the module is named
+after the C file it ports.
+
+**Globals.** Doom shares many mutable globals between modules (`gametic`,
+`usegamma`, `prndindex`, ...). R6RS forbids assigning an imported variable,
+and Chez also refuses an exported macro that `set!`s a private one. So
+`(define-global name init)` stores the value in a box and exports `name` as an
+identifier macro. Any module can then write `name` and `(set! name v)` exactly
+as in C, at the cost of one box indirection.
 
 ## Core representation choices
 
 **Integers and wraparound.** Doom relies on 32-bit overflow in two places:
 `angle_t` is an unsigned 32-bit value that wraps constantly, and some
 `fixed_t` (signed 16.16) arithmetic overflows. Chez fixnums are 61-bit, so:
-- Angles: every angle add or subtract goes through `(angle+ a b)`, which applies
-  `(fxand … #xFFFFFFFF)`. A small `angle` library owns this.
-- Fixed point: `fixed-mul` is `(fxsra (* a b) 16)` wrapped to int32.
-  The product of two int32 values can exceed fixnum range, so we use generic
-  `*` there, which handles the rare bignum case correctly. We profile it before
-  doing anything cleverer.
-- `wrap32` gets applied wherever the C silently overflows. We find those places
-  by diffing demo traces, not by guessing.
+- Angles: every angle add or subtract goes through `angle+`/`angle-` (in
+  `tables`, where `angle_t` lives), which apply `(fxand … #xFFFFFFFF)`.
+- Fixed point: `fixed-mul` is `(int32 (ash (* a b) -16))`. The product of two
+  int32 values can exceed fixnum range, so it uses generic `*`. We profile it
+  before doing anything cleverer.
+- `int32` gets applied wherever the C silently overflows. So does `c-abs`,
+  because C's `abs(MININT)` stays `MININT`; `FixedDiv` depends on that. We find
+  further places by diffing demo traces, not by guessing.
 
 **FixedDiv.** linuxdoom-1.10's `FixedDiv2` computes
 `(fixed_t)((double)a / (double)b * FRACUNIT)` (the integer version is `#if 0`'d
-out), and we match it exactly:
-`(flonum->fixnum (fl* (fl/ (fixnum->flonum a) (fixnum->flonum b)) 65536.0))`,
-truncating toward zero like a C cast. It differs from DOS v1.9's integer
-division in rare low-bit cases. That is fine, because our target is linuxdoom,
-not v1.9.
+out). For int32 inputs this provably equals exact truncating integer division.
+The numerator `a·2^16` is below 2^47 in magnitude, so a non-integer quotient
+never comes within 2^-47 (relative) of an integer. A correctly rounded double,
+or an x87 extended value, therefore can't round across one. We implement it
+as exact `quotient`, which keeps it independent of FPU mode.
+`tests/fixed.ss` confirms this on 300k cases against the oracle's own
+`m_fixed.o`, including the `abs(MININT)` paths. One consequence: the
+"linuxdoom vs. DOS v1.9 FixedDiv" difference doesn't exist.
 
 **Structs → mutable records.** `mobj_t`, `player_t`, `sector_t`, `line_t`,
 `seg_t`, and the others become `define-record-type` with mutable fields. Hot
@@ -119,10 +130,15 @@ circular-import knot.
 (`PU_LEVEL` and the like) go away, because level data is simply dropped on
 reload. `W_CacheLumpNum` becomes a memoizing lump→bytevector cache.
 
-**Framebuffers.** `screens[0..4]` are `SCREENWIDTH*SCREENHEIGHT`-byte bytevectors of palette
-indices, exactly like the C code. The renderer writes palette indices. The
+**Framebuffers.** `screens[0..4]` are slices of one bytevector, `screens`,
+starting at `(screen-base n)`. In C, screens 0–3 are carved contiguously out of
+one allocation, and code relies on it: `G_DoSaveGame` writes the save buffer
+at `screens[1]+0x4000` and can run into `screens[2]`. Pixels are palette
+indices. The
 platform layer converts to ARGB once per frame through a 256-entry palette
-lookup and uploads to an SDL streaming texture. Gamma and palette flashes
+lookup and uploads to an SDL streaming texture. `I_SetPalette` passes each
+component through `gammatable[usegamma]`, as linuxdoom does. Note that even
+gamma 0 is not the identity: it maps 0..127 to 1..128. Palette flashes
 (damage, pickup) are just a palette swap, as in the original.
 
 **Endianness/parsing.** WAD lumps are read with `bytevector-s16-ref` and related
@@ -206,8 +222,8 @@ Smaller layers get unit tests against values extracted from C: fixed math,
 
 Each milestone ends with something visible or testable.
 
-0. **Bootstrap:** flake, SDL window, WAD fetch, oracle builds and traces DEMO1.
-1. **WAD + video:** `w_wad`, `v_video`, and the palette. Draws TITLEPIC and
+0. ✅ **Bootstrap:** flake, SDL window, WAD fetch, oracle builds and traces DEMO1.
+1. ✅ **WAD + video:** `w_wad`, `v_video`, and the palette. Draws TITLEPIC and
    patches. Also `m_fixed`, `m_random`, and the generated `tables`.
 2. **Level load + automap:** `p_setup` and `am_map`. You can see E1M1 as lines.
 3. **Software renderer:** `r_bsp`, `r_segs`, `r_plane`, `r_draw`, `r_sky`,

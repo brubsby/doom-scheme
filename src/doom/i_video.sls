@@ -1,16 +1,10 @@
-;;; i_video: present an 8-bit indexed framebuffer through SDL2.
-;;; The renderer writes palette indices into a SCREENWIDTH*SCREENHEIGHT
-;;; bytevector; i-finish-update expands it to ARGB via the current palette
-;;; and shows it 4:3 aspect-corrected.
-(library (i video)
-  (export SCREENWIDTH SCREENHEIGHT
-          i-init-graphics i-shutdown-graphics i-set-palette i-finish-update
+;;; i_video: present screens[0] (8-bit palette indices) through SDL2.
+;;; i-finish-update expands it to ARGB via the current palette and shows it
+;;; 4:3 aspect-corrected.
+(library (doom i_video)
+  (export i-init-graphics i-shutdown-graphics i-set-palette i-finish-update
           i-read-pixels i-poll-events)
-  (import (chezscheme) (i sdl))
-
-  ;; Fixed at vanilla's 320x200 for now; see DESIGN.md "Future: hi-res".
-  (define SCREENWIDTH 320)
-  (define SCREENHEIGHT 200)
+  (import (chezscheme) (doom i_sdl) (doom doomdef) (doom v_video))
 
   (define window 0)
   (define renderer 0)
@@ -43,31 +37,43 @@
     (unless (eqv? window 0) (sdl-destroy-window window) (set! window 0))
     (sdl-quit))
 
-  ;; pal: 768 bytes of RGB triples (one PLAYPAL palette).
-  (define (i-set-palette pal)
-    (do ([i 0 (fx+ i 1)]) ((fx= i 256))
-      (let ([j (fx* i 3)])
-        (fxvector-set! palette32 i
-                       (fxior #xFF000000
-                              (fxsll (bytevector-u8-ref pal j) 16)
-                              (fxsll (bytevector-u8-ref pal (fx+ j 1)) 8)
-                              (bytevector-u8-ref pal (fx+ j 2)))))))
+  ;; I_SetPalette: 768 bytes of RGB triples (one PLAYPAL palette, starting at
+  ;; `offset`), each component passed through gammatable[usegamma] as in
+  ;; linuxdoom.
+  (define i-set-palette
+    (case-lambda
+      [(pal) (i-set-palette pal 0)]
+      [(pal offset)
+       (let ([gamma (fx* usegamma 256)])
+         (define (c j)
+           (bytevector-u8-ref gammatable
+                              (fx+ gamma (bytevector-u8-ref pal (fx+ offset j)))))
+         (do ([i 0 (fx+ i 1)]) ((fx= i 256))
+           (let ([j (fx* i 3)])
+             (fxvector-set! palette32 i
+                            (fxior #xFF000000
+                                   (fxsll (c j) 16)
+                                   (fxsll (c (fx+ j 1)) 8)
+                                   (c (fx+ j 2)))))))]))
 
-  (define (i-finish-update screen)
+  ;; I_FinishUpdate: show screens[0].
+  (define (i-finish-update)
     (let ([n (fx* SCREENWIDTH SCREENHEIGHT)])
       (do ([i 0 (fx+ i 1)]) ((fx= i n))
         (bytevector-u32-native-set! argb (fxsll i 2)
-                                    (fxvector-ref palette32 (bytevector-u8-ref screen i)))))
+                                    (fxvector-ref palette32 (bytevector-u8-ref screens i)))))
     (sdl-update-texture texture 0 argb (fx* SCREENWIDTH 4))
     (sdl-render-clear renderer)
     (sdl-render-copy renderer texture 0 0)
     (sdl-render-present renderer))
 
-  ;; For tests/screenshots: the presented logical frame as ARGB8888 bytes.
+  ;; For tests/screenshots: the whole presented window (physical pixels, so
+  ;; including scaling and letterboxing) as ARGB8888 bytes.
   (define (i-read-pixels)
-    (let* ([w SCREENWIDTH] [h (* SCREENHEIGHT 6/5)] [bv (make-bytevector (* w h 4))])
-      (sdl-render-read-pixels renderer 0 SDL_PIXELFORMAT_ARGB8888 bv (* w 4))
-      (values w h bv)))
+    (let-values ([(w h) (sdl-get-renderer-output-size renderer)])
+      (let ([bv (make-bytevector (* w h 4))])
+        (sdl-render-read-pixels renderer 0 SDL_PIXELFORMAT_ARGB8888 bv (* w 4))
+        (values w h bv))))
 
   ;; Drain SDL's queue, calling (handle ev) for each. Returns #f on SDL_QUIT.
   (define ev (make-sdl-event))

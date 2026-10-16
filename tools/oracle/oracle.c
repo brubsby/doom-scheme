@@ -8,6 +8,8 @@
 //   ORACLE_TRACE=path        write the trace here (required)
 //   ORACLE_PPM_DIR=dir       also dump screens[0] as dir/tNNNNN.ppm ...
 //   ORACLE_PPM_EVERY=n       ... every n tics (default 35)
+//   ORACLE_MAX_FRAMES=n      exit(0) after n frames (e.g. to grab the title
+//                            screen without -timedemo)
 //
 // TRACE FORMAT (one line per tic, space separated, decimal):
 //   gametic gamestate leveltime prndindex rndindex
@@ -41,6 +43,7 @@ extern int prndindex, rndindex;
 static FILE* tracefile;
 static char* ppmdir;
 static int   ppmevery = 35;
+static int   maxframes = -1, frames;
 
 typedef uint32_t u32;
 #define FNV_INIT 2166136261u
@@ -84,6 +87,7 @@ void oracle_tic (void)
         tracefile = fopen (path, "w");
         ppmdir = getenv ("ORACLE_PPM_DIR");
         if (getenv ("ORACLE_PPM_EVERY")) ppmevery = atoi (getenv ("ORACLE_PPM_EVERY"));
+        if (getenv ("ORACLE_MAX_FRAMES")) maxframes = atoi (getenv ("ORACLE_MAX_FRAMES"));
     }
 
     if (gamestate == GS_LEVEL)
@@ -122,4 +126,7 @@ void oracle_tic (void)
 
     if (ppmdir && ppmevery > 0 && gametic % ppmevery == 0)
         dump_ppm ();
+
+    if (maxframes >= 0 && ++frames >= maxframes)
+        exit (0);
 }
