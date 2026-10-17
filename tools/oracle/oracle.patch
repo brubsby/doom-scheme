@@ -115,3 +115,26 @@
    
    // start sound process
    if ( !access(buffer, X_OK) )
+--- linuxdoom-1.10/i_net.c
++++ linuxdoom-1.10/i_net.c
+@@ -113,6 +113,10 @@
+     memset (&address, 0, sizeof(address));
+     address.sin_family = AF_INET;
+     address.sin_addr.s_addr = INADDR_ANY;
++    // oracle: two nodes on one machine need their own addresses (packets
++    // are told apart by address alone): ORACLE_NETBIND binds there.
++    if (getenv ("ORACLE_NETBIND"))
++	address.sin_addr.s_addr = inet_addr (getenv ("ORACLE_NETBIND"));
+     address.sin_port = port;
+ 			
+     v = bind (s, (void *)&address, sizeof(address));
+@@ -329,6 +333,9 @@
+     ioctl (insocket, FIONBIO, &trueval);
+ 
+     sendsocket = UDPsocket ();
++    // oracle: ... and send from there too.
++    if (getenv ("ORACLE_NETBIND"))
++	BindToLocalPort (sendsocket, 0);
+ }
+ 
+ 

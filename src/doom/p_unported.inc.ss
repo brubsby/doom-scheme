@@ -25,6 +25,10 @@
 ;; this when it loads).
 (define-global am-stop-hook (lambda () (void)))
 
+;; G_DeathMatchSpawnPlayer, for P_SetupLevel (g_game is above the playsim;
+;; d_main sets this when it loads).
+(define-global deathmatch-spawn-hook (lambda (playernum) (void)))
+
 ;; ST_Start and HU_Start, for P_SpawnPlayer (the front end is above the
 ;; playsim; d_main sets these when it loads).
 (define-global st-start-hook (lambda () (void)))

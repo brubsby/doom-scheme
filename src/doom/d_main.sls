@@ -29,7 +29,7 @@
           (doom sounds) (doom dstrings) (doom m_fixed) (doom m_random) (doom m_argv)
           (doom tables) (doom w_wad) (doom v_video) (doom i_system) (doom i_video)
           (doom r_defs) (doom r_data) (doom r_local) (doom p_mobj.h) (doom p_local)
-          (doom am_map) (doom s_sound) (doom i_sound) (doom r_interp) (doom m_cheat) (doom d_items) (doom st_lib)
+          (doom am_map) (doom s_sound) (doom i_sound) (doom r_interp) (doom i_net) (doom m_cheat) (doom d_items) (doom st_lib)
           (doom hu_lib) (doom f_wipe))
 
   ;; Globals shared between the included files (define-global makes a
@@ -106,6 +106,7 @@
   (define hooks-installed
     (begin
       (set! r-net-update net-update)
+      (set! deathmatch-spawn-hook g-death-match-spawn-player)
       (set! st-start-hook st-start)
       (set! hu-start-hook hu-start)
       (set! st-responder-hook st-responder)

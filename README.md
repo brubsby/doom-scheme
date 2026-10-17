@@ -18,6 +18,8 @@ make run ARGS="-warp 1 3 -skill 4"   # any of linuxdoom's command line (and -nos
 make run ARGS="-uncapped"            # interpolated frames at the display's rate
 make run ARGS="-hires 2"             # the 3D view at 640x400 (or -hires 4: 1280x800)
 DOOMWADDIR=wads/freedoom2 make run   # DOOM II's code paths, with Freedoom's data
+make run ARGS="-net 1 .192.168.1.20 -deathmatch"   # netgame (UDP 5029), with
+                    # the other node -net 2 .<this host>; linuxdoom can be either
 make test           # Scheme vs. oracle: the renderer, the playsim, and every
                     # frame and sound buffer of demos, menus, intermission,
                     # finale, saving and loading

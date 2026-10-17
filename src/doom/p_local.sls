@@ -37,6 +37,7 @@
    p-archive-specials p-unarchive-specials saveg-layouts layout-offsets layout-size
    ;; stand-ins for unported functions
    unported unported-calls unported-first-tic am-stop-hook st-start-hook hu-start-hook
+   deathmatch-spawn-hook
    ;; p_local.h
    FLOATSPEED MAXHEALTH VIEWHEIGHT
           MAPBLOCKUNITS MAPBLOCKSIZE MAPBLOCKSHIFT MAPBMASK MAPBTOFRAC

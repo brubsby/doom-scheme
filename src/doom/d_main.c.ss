@@ -416,6 +416,7 @@
       (lambda (c)
         (k (cond
              [(doom-quit? c)
+              (d-quit-net-game)
               (i-shutdown-sound)
               (i-shutdown-music)
               (m-save-defaults)
@@ -425,6 +426,8 @@
               (when demorecording
                 (guard (c2 [#t (void)])
                   (g-check-demo-status)))
+              (guard (c2 [#t (void)])
+                (d-quit-net-game))
               (i-close-sound)
               (i-shutdown-graphics)
               (display (string-append "Error: " (condition-message c) "\n") (current-error-port))

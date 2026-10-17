@@ -659,6 +659,26 @@ Each milestone ends with something visible or testable.
 Roughly 45k lines of C, about 10k of which is data (`info.c` and `tables.c`) that
 gets generated rather than written.
 
+## Netgames
+
+`d_net` and `i_net` are linuxdoom's: `-net <player> <host> ...` (a host
+`.a.b.c.d` is an address), UDP on port 5029 (`-port`), `-dup`, `-extratic`,
+the key player's setup packets (skill, episode, map, deathmatch,
+-nomonsters, -respawn), retransmission, players leaving, and the
+non-key players' clock adjustment. The packet format is the same, so the
+port and linuxdoom play together. `tests/net.ss` does exactly that on one
+machine, linuxdoom on 127.0.0.1 and the port on 127.0.0.2 (packets are told
+apart by address alone, so each binds its own: `ORACLE_NETBIND` in the
+oracle, `net-bind-address` in the port), with fake time and each node
+scripting its own player: coop with the oracle as key player, `-dup 2
+-extratic`, nightmare where the players keep dying and respawning, and
+deathmatch with the port as key player. The game is lockstep, and
+linuxdoom's consistency check (each command carries its player's x) would
+stop it on any difference; on top of that, every frame the oracle traces
+must match the port's simulation at that gametic. (Deathmatch's
+`G_DeathMatchSpawnPlayer` at level start had been left out since milestone
+6; this found it.)
+
 ## Uncapped framerate (`-uncapped`)
 
 With `-uncapped` the main loop doesn't wait for the next tic: `TryRunTics`

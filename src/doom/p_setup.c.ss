@@ -298,7 +298,12 @@
          (set! bodyqueslot 0)
          (set! deathmatch_p 0)
          (p-load-things (fx+ lumpnum ML_THINGS))
-         ;; TODO(milestone 6): deathmatch respawn (G_DeathMatchSpawnPlayer).
+         ;; if deathmatch, randomly spawn the active players
+         (unless (fx= deathmatch 0)
+           (do ([i 0 (fx+ i 1)]) ((fx= i MAXPLAYERS))
+             (when (vector-ref playeringame i)
+               (player-mo-set! (vector-ref players i) #f)
+               (deathmatch-spawn-hook i))))
          ;; clear special respawning que
          (set! iquehead 0)
          (set! iquetail 0)
