@@ -556,8 +556,16 @@
 
 (define (p-spawn-specials)
   ;; See if -TIMER needs to be used.
-  ;; TODO(milestone 9): -avg and -timer (deathmatch only).
   (set! levelTimer #f)
+  (when (and (fx> (m-check-parm "-avg") 0) (not (fx= deathmatch 0)))
+    (set! levelTimer #t)
+    (set! levelTimeCount (* 20 60 35)))
+  (let ([i (m-check-parm "-timer")])
+    (when (and (fx> i 0) (not (fx= deathmatch 0)))
+      ;; (C reads myargv[i+1] even when it is past the end)
+      (set! levelTimer #t)
+      (set! levelTimeCount (fx* (if (fx< i (fx- myargc 1)) (m-atoi (vector-ref myargv (fx+ i 1))) 0)
+                                (* 60 35)))))
   ;; Init special SECTORs.
   (do ([i 0 (fx+ i 1)]) ((fx= i numsectors))
     (let ([sector (vector-ref sectors i)])

@@ -143,7 +143,11 @@
 (define (d-doom-loop)
   (when demorecording
     (g-begin-recording))
-  ;; (-debugfile is not supported)
+  (when (fx> (m-check-parm "-debugfile") 0)
+    (let ([filename (format "debug~a.txt" consoleplayer)])
+      (printf "debug output to: ~a\n" filename)
+      (set! debugfile (open-file-output-port filename (file-options no-fail)
+                                             (buffer-mode line) (native-transcoder)))))
   (unless nodrawers
     (i-init-graphics))
   (let loop ()
@@ -268,11 +272,51 @@
     (and (fx> p 0) (fx< p (fx- myargc 1)) (arg (fx+ p 1)))))
 (define (digit c) (fx- (char->integer c) (char->integer #\0)))
 
+;; FindResponseFile: an argument @file is replaced by the arguments in
+;; file (separated by anything but the characters '!' to 'z'), the ones
+;; after it kept after them.
+(define MAXARGVS 100)
+(define (find-response-file)
+  (let loop ([i 1])
+    (when (fx< i myargc)
+      (if (not (char=? (string-ref (arg i) 0) #\@))
+          (loop (fx+ i 1))
+          (let* ([name (substring (arg i) 1 (string-length (arg i)))]
+                 [file (guard (c [(i/o-error? c) #f])
+                         (call-with-port (open-file-input-port name) get-bytevector-all))])
+            (unless file
+              (printf "\nNo such response file!")
+              (exit 1))
+            (printf "Found response file ~a!\n" name)
+            ;; KEEP ALL CMDLINE ARGS FOLLOWING @RESPONSEFILE ARG
+            (let* ([moreargs (let more ([k (fx+ i 1)])
+                               (if (fx< k myargc) (cons (arg k) (more (fx+ k 1))) '()))]
+                   [size (if (eof-object? file) 0 (bytevector-length file))]
+                   [argchar? (lambda (k) (let ([c (bytevector-u8-ref file k)]) (fx<= 33 c 122)))]
+                   ;; the file's arguments: C takes one at the start even
+                   ;; if the file begins with separators (or is empty)
+                   [fileargs
+                    (let next ([k 0] [acc '()])
+                      (let* ([end (let run ([k k]) (if (and (fx< k size) (argchar? k)) (run (fx+ k 1)) k))]
+                             [a (let ([b (make-bytevector (fx- end k))]) (bytevector-copy! file k b 0 (fx- end k)) (utf8->string b))]
+                             [k (let skip ([k end]) (if (and (fx< k size) (not (argchar? k))) (skip (fx+ k 1)) k))])
+                        (if (fx< k size)
+                            (next k (cons a acc))
+                            (reverse (cons a acc)))))]
+                   [args (cons (arg 0) (append fileargs moreargs))]
+                   [args (if (fx> (length args) MAXARGVS) (list-head args MAXARGVS) args)])
+              (m-set-args! args)
+              ;; DISPLAY ARGS
+              (printf "~a command-line args:\n" myargc)
+              (do ([k 1 (fx+ k 1)]) ((fx= k myargc))
+                (printf "~a\n" (arg k)))))))))
+
 ;; D_DoomMain. (-turbo, -wart, -file, -record, -playdemo, -timedemo,
 ;; -skill, -episode, -warp, -nomonsters, -respawn, -fast, -deathmatch,
-;; -altdeath, -devparm, -loadgame and -config work.)
+;; -altdeath, -timer, -avg, -devparm, -loadgame, -config, -debugfile and
+;; @responsefile work.)
 (define (d-doom-main)
-  ;; (FindResponseFile: @responsefile is not supported)
+  (find-response-file)
   (identify-version)
   (set! modifiedgame #f)
   (set! nomonsters (fx> (m-check-parm "-nomonsters") 0))
@@ -301,7 +345,7 @@
   ;; turbo option
   (let ([p (m-check-parm "-turbo")])
     (unless (fx= p 0)
-      (let* ([scale (if (fx< p (fx- myargc 1)) (or (string->number (arg (fx+ p 1))) 0) 200)]
+      (let* ([scale (if (fx< p (fx- myargc 1)) (m-atoi (arg (fx+ p 1))) 200)]
              [scale (fxmax 10 (fxmin 400 scale))])
         (printf "turbo scale: ~a%\n" scale)
         (fxvector-set! forwardmove 0 (fxquotient (fx* (fxvector-ref forwardmove 0) scale) 100))
@@ -337,11 +381,19 @@
       (set! startepisode (digit (string-ref e 0)))
       (set! startmap 1)
       (set! autostart #t)))
-  ;; (-timer and -avg are deathmatch options; p_spec doesn't support them)
+  (let ([p (m-check-parm "-timer")])
+    (when (and (fx> p 0) (fx< p (fx- myargc 1)) (not (fx= deathmatch 0)))
+      (let ([time (m-atoi (arg (fx+ p 1)))])
+        (printf "Levels will end after ~a minute" time)
+        (when (fx> time 1) (printf "s"))
+        (printf ".\n"))))
+  (let ([p (m-check-parm "-avg")])
+    (when (and (fx> p 0) (fx< p (fx- myargc 1)) (not (fx= deathmatch 0)))
+      (printf "Austin Virtual Gaming: Levels will end after 20 minutes\n")))
   (let ([p (m-check-parm "-warp")])
     (when (and (fx> p 0) (fx< p (fx- myargc 1)))
       (if (fx= gamemode commercial)
-          (set! startmap (or (string->number (arg (fx+ p 1))) 0))
+          (set! startmap (m-atoi (arg (fx+ p 1))))
           (begin
             (set! startepisode (digit (string-ref (arg (fx+ p 1)) 0)))
             (set! startmap (digit (string-ref (arg (fx+ p 2)) 0)))))

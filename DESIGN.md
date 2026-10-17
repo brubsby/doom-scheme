@@ -659,6 +659,17 @@ Each milestone ends with something visible or testable.
 Roughly 45k lines of C, about 10k of which is data (`info.c` and `tables.c`) that
 gets generated rather than written.
 
+## The command line
+
+Everything linuxdoom's `D_DoomMain` and its subsystems read works,
+including `@responsefile` (with C's notion of an argument: the characters
+'!' to 'z'), `-debugfile` (`debugN.txt`, the net code's log, compared with
+the oracle's), and the deathmatch level timer (`-timer`, `-avg`). Not
+ported, on purpose: `-statcopy`, which takes a memory address (as decimal)
+for a DOS statistics driver to read, and `-shdev`, `-regdev` and `-comdev`,
+which load id's development data from fixed paths. The port adds
+`-nosound`, `-nomusic`, `-uncapped` and `-hires`.
+
 ## Netgames
 
 `d_net` and `i_net` are linuxdoom's: `-net <player> <host> ...` (a host

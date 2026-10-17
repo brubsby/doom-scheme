@@ -51,7 +51,7 @@
           (doom r_data) (doom r_local) (doom p_mobj.h) (doom info) (doom m_fixed)
           (doom m_bbox) (doom m_random) (doom tables) (doom w_wad) (doom i_system)
           (doom d_ticcmd) (doom d_event) (doom s_sound) (doom sounds) (doom d_items)
-          (doom dstrings))
+          (doom dstrings) (doom m_argv))
 
   (define FLOATSPEED (* FRACUNIT 4))
   (define MAXHEALTH 100)

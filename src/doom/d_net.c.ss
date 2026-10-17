@@ -46,6 +46,32 @@
   (do ([i 0 (fx+ i 1)]) ((fx= i BACKUPTICS))
     (struct-copy! (vector-ref (doomdata-cmds dst) i) (vector-ref (doomdata-cmds src) i))))
 
+;; -debugfile: debugN.txt, a log of the packets (as their bytes in memory:
+;; the checksum and the ticcmds' shorts little-endian) and of TryRunTics.
+(define debugfile #f)
+(define (debug-bytes)
+  (let* ([nb (netbuffer)] [bv (make-bytevector (fx+ 8 (fx* 8 BACKUPTICS)) 0)])
+    (bytevector-u32-set! bv 0 (doomdata-checksum nb) (endianness little))
+    (bytevector-u8-set! bv 4 (doomdata-retransmitfrom nb))
+    (bytevector-u8-set! bv 5 (doomdata-starttic nb))
+    (bytevector-u8-set! bv 6 (doomdata-player nb))
+    (bytevector-u8-set! bv 7 (doomdata-numtics nb))
+    (do ([c 0 (fx+ c 1)]) ((fx= c BACKUPTICS))
+      (let ([cmd (vector-ref (doomdata-cmds nb) c)] [o (fx+ 8 (fx* 8 c))])
+        (bytevector-s8-set! bv o (ticcmd-forwardmove cmd))
+        (bytevector-s8-set! bv (fx+ o 1) (ticcmd-sidemove cmd))
+        (bytevector-u16-set! bv (fx+ o 2) (fxand (ticcmd-angleturn cmd) #xffff) (endianness little))
+        (bytevector-u16-set! bv (fx+ o 4) (fxand (ticcmd-consistancy cmd) #xffff) (endianness little))
+        (bytevector-u8-set! bv (fx+ o 6) (ticcmd-chatchar cmd))
+        (bytevector-u8-set! bv (fx+ o 7) (ticcmd-buttons cmd))))
+    (do ([i 0 (fx+ i 1)]) ((fx= i (doomcom-datalength doomcom*)))
+      (fprintf debugfile "~a " (bytevector-u8-ref bv (fxmin i (fx- (bytevector-length bv) 1)))))
+    (fprintf debugfile "\n")))
+(define (debug-retransmit)
+  (if (fxlogtest (doomdata-checksum (netbuffer)) NCMD_RETRANSMIT)
+      (expand-tics (doomdata-retransmitfrom (netbuffer)))
+      -1))
+
 ;; NetbufferSize: the header and the tics in it.
 (define (netbuffer-size) (fx+ 8 (fx* 8 (doomdata-numtics (netbuffer)))))
 
@@ -74,7 +100,11 @@
      (doomcom-command-set! doomcom* CMD_SEND)
      (doomcom-remotenode-set! doomcom* node)
      (doomcom-datalength-set! doomcom* (netbuffer-size))
-     ;; (-debugfile is not supported)
+     (when debugfile
+       (fprintf debugfile "send (~a + ~a, R ~a) [~a] "
+                (expand-tics (doomdata-starttic (netbuffer))) (doomdata-numtics (netbuffer))
+                (debug-retransmit) (doomcom-datalength doomcom*))
+       (debug-bytes))
      (i-net-cmd)]))
 
 ;; HGetPacket: returns #f if no packet is waiting.
@@ -90,9 +120,26 @@
     [else
      (doomcom-command-set! doomcom* CMD_GET)
      (i-net-cmd)
-     (and (not (fx= (doomcom-remotenode doomcom*) -1))
-          (fx= (doomcom-datalength doomcom*) (netbuffer-size))
-          (fx= (netbuffer-checksum) (fxand (doomdata-checksum (netbuffer)) NCMD_CHECKSUM)))]))
+     (cond
+       [(fx= (doomcom-remotenode doomcom*) -1) #f]
+       [(not (fx= (doomcom-datalength doomcom*) (netbuffer-size)))
+        (when debugfile
+          (fprintf debugfile "bad packet length ~a\n" (doomcom-datalength doomcom*)))
+        #f]
+       [(not (fx= (netbuffer-checksum) (fxand (doomdata-checksum (netbuffer)) NCMD_CHECKSUM)))
+        (when debugfile (fprintf debugfile "bad packet checksum\n"))
+        #f]
+       [else
+        (when debugfile
+          (if (fxlogtest (doomdata-checksum (netbuffer)) NCMD_SETUP)
+              (fprintf debugfile "setup packet\n")
+              (begin
+                (fprintf debugfile "get ~a = (~a + ~a, R ~a)[~a] "
+                         (doomcom-remotenode doomcom*)
+                         (expand-tics (doomdata-starttic (netbuffer))) (doomdata-numtics (netbuffer))
+                         (debug-retransmit) (doomcom-datalength doomcom*))
+                (debug-bytes))))
+        #t])]))
 
 ;; GetPackets
 (define exitmsg "")
@@ -127,14 +174,22 @@
                         (fxlogtest (doomdata-checksum nb) NCMD_RETRANSMIT))
                    (begin
                      (fxvector-set! resendto netnode (expand-tics (doomdata-retransmitfrom nb)))
+                     (when debugfile
+                       (fprintf debugfile "retransmit from ~a\n" (fxvector-ref resendto netnode)))
                      (fxvector-set! resendcount netnode RESENDCOUNT))
                    (fxvector-set! resendcount netnode (fx- (fxvector-ref resendcount netnode) 1)))
                (cond
                  ;; check for out of order / duplicated packet
-                 [(fx<= realend (fxvector-ref nettics netnode)) (void)]
+                 [(fx= realend (fxvector-ref nettics netnode)) (void)]
+                 [(fx< realend (fxvector-ref nettics netnode))
+                  (when debugfile
+                    (fprintf debugfile "out of order packet (~a + ~a)\n" realstart (doomdata-numtics nb)))]
                  ;; check for a missed packet: stop processing until the
                  ;; other system resends the missed tics
                  [(fx> realstart (fxvector-ref nettics netnode))
+                  (when debugfile
+                    (fprintf debugfile "missed tics from ~a (~a - ~a)\n"
+                             netnode realstart (fxvector-ref nettics netnode)))
                   (vector-set! remoteresend netnode #t)]
                  [else
                   ;; update command store from the packet
@@ -289,6 +344,9 @@
 ;; D_QuitNetGame: called before quitting to leave a net game without
 ;; hanging the other players.
 (define (d-quit-net-game)
+  (when debugfile
+    (close-port debugfile)
+    (set! debugfile #f))
   (when (and netgame usergame (not (fx= consoleplayer -1)) (not demoplayback))
     ;; send a bunch of packets for security
     (doomdata-player-set! (netbuffer) consoleplayer)
@@ -340,6 +398,8 @@
                          [else availabletics])]
            [counts (if (fx< counts 1) 1 counts)])
       (set! frameon (fx+ frameon 1))
+      (when debugfile
+        (fprintf debugfile "=======real: ~a  avail: ~a  game: ~a\n" realtics availabletics counts))
       (unless demoplayback
         ;; ideally nettics[0] should be 1 - 3 tics above lowtic; if we are
         ;; consistantly slower, speed up time

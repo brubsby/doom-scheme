@@ -166,6 +166,17 @@
     ("fd1-e4" ("-warp" "4" "8" "-skill" "3")
      ((420 ,ESC) (424 ,ESC))
      ((10 . n)) 2500 ((wad "freedoom1")))
+;; -debugfile (debug0.txt, TryRunTics' log, compared), and a response
+    ;; file (@file: arguments separated by anything but '!' to 'z').
+    ("debugfile" ("-warp" "1" "1" "-debugfile")
+     ((5 (+ ,UP)) (40 (- ,UP)))
+     () 400)
+    ("responsefile" ("@args.rsp" "-nomonsters")
+     () () 400
+     ((write "args.rsp" "-warp 1 3\n-skill\t4|-respawn")))
+    ;; -timer: a deathmatch level ends after so many minutes (one here).
+    ("timer" ("-warp" "1" "1" "-deathmatch" "-timer" "1")
+     () () 2400)
     ;; -devparm: the tic-rate dots, and screenshots (F1), which must be the
     ;; oracle's PCX files byte for byte.
     ("screenshot" ("-warp" "1" "1" "-devparm")
@@ -400,6 +411,27 @@
           (check (format "~a: .doomrc written as the oracle's" name)
                  (read-raw theirs)
                  (read-raw (format "~a/~a/port/home/.doomrc" dir name)))))
+      ;; -debugfile's logs: the oracle's, then (the port runs one frame
+      ;; past the oracle's last) at most one more line.
+      (for-each
+       (lambda (f)
+         (let ([theirs (read-raw (format "~a/~a/oracle/~a" dir name f))]
+               [ours (let ([p (format "~a/~a/port/~a" dir name f)])
+                       (if (file-exists? p) (read-raw p) (bytevector)))])
+           (check (format "~a: ~a written as the oracle's" name f) #t
+                  (and (>= (bytevector-length ours) (bytevector-length theirs))
+                       (let loop ([i 0])
+                         (or (= i (bytevector-length theirs))
+                             (and (= (bytevector-u8-ref ours i) (bytevector-u8-ref theirs i))
+                                  (loop (+ i 1)))))
+                       (<= (let count ([i (bytevector-length theirs)] [n 0])
+                             (if (= i (bytevector-length ours))
+                                 n
+                                 (count (+ i 1) (if (= (bytevector-u8-ref ours i) 10) (+ n 1) n))))
+                           1)))))
+       (filter (lambda (f) (and (> (string-length f) 9) (string=? (substring f 0 5) "debug")
+                                (string=? (substring f (- (string-length f) 4) (string-length f)) ".txt")))
+               (directory-list (format "~a/~a/oracle" dir name))))
       ;; Screenshots. (pcx_t's reserved byte, 64, is left uninitialized.)
       (for-each
        (lambda (f)
