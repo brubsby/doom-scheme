@@ -10,7 +10,8 @@
 ;;; linuxdoom has no music (its music calls are dummies, and the DOS
 ;;; version's went to DMX). Music here is Chocolate Doom's OPL player
 ;;; (i_oplmusic), on its own SDL device at 44100 Hz, kept full the same way.
-;;; -nosound turns off both, -nomusic the music.
+;;; -nosound turns off both, -nomusic the music; -opl3 plays it in stereo
+;;; on an OPL3 (DMXOPTION, as Chocolate's snd_dmxoption, works too).
 (library (doom i_sound)
   (export i-init-sound i-shutdown-sound i-close-sound i-update-sound i-submit-sound
           i-set-channels i-get-sfx-lump-num i-start-sound i-stop-sound
@@ -62,6 +63,10 @@
                   (if (eqv? device 0)
                       (printf "I_InitSound: could not open audio device (~a)\n" (sdl-get-error))
                       (sdl-pause-audio-device device 0))
+                  ;; -opl3: Chocolate's OPL3 mode (18 voices, stereo pan),
+                  ;; with the channels the right way round
+                  (when (fx> (m-check-parm "-opl3") 0)
+                    (oplmusic-dmxoption "-opl3 -reverse"))
                   (unless (or (fx> (m-check-parm "-nomusic") 0)
                               (not (oplmusic-init MUSICRATE)))
                     (set! music-device (sdl-open-audio-device MUSICRATE 2 MUSICCHUNK))

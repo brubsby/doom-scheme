@@ -492,7 +492,9 @@ player (`probes/music_probe.c`, linking its `i_oplmusic.c`, `mus2mid.c`,
 for SDL) and the port: every doom1.wad song, looping past the end, volume
 changes, pause, song changes, both sample rates, OPL3 mode and the older
 DMX driver behaviours. The menu's music volume (0–15) is the player's
-volume divided by 8, as in Chocolate. `-nomusic` turns it off.
+volume divided by 8, as in Chocolate. `-nomusic` turns it off, and `-opl3`
+plays it on an OPL3 in stereo (Chocolate's `snd_dmxoption` "-opl3
+-reverse"; `DMXOPTION` sets the string directly).
 
 **Sound effects bugs, kept on purpose.**
 - The chaingun is silent. Its sound is a link to the pistol's, and the
@@ -673,7 +675,7 @@ the oracle's), and the deathmatch level timer (`-timer`, `-avg`). Not
 ported, on purpose: `-statcopy`, which takes a memory address (as decimal)
 for a DOS statistics driver to read, and `-shdev`, `-regdev` and `-comdev`,
 which load id's development data from fixed paths. The port adds
-`-nosound`, `-nomusic`, `-uncapped` and `-hires`.
+`-nosound`, `-nomusic`, `-opl3`, `-uncapped` and `-hires`.
 
 ## Netgames
 

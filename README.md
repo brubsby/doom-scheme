@@ -14,7 +14,8 @@ make wad            # fetch + verify the v1.9 shareware doom1.wad into wads/
 make freedoom       # optional: Freedoom as doom2.wad / doomu.wad, for more tests
 make run            # DOOM: title loop, menus (ESC), the shareware episode, sound,
                     # savegames, ~/.doomrc
-make run ARGS="-warp 1 3 -skill 4"   # any of linuxdoom's command line (and -nosound)
+make run ARGS="-warp 1 3 -skill 4"   # any of linuxdoom's command line (and -nosound,
+                    # -nomusic, -opl3 for stereo OPL3 music)
 make run ARGS="-uncapped"            # interpolated frames at the display's rate
                     # (a gamepad: use_joystick 1 in ~/.doomrc; mouse: -grabmouse)
 make run ARGS="-hires 2"             # the 3D view at 640x400 (or -hires 4: 1280x800)
