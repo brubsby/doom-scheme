@@ -57,6 +57,8 @@
         (wipe-start-screen 0 0 SCREENWIDTH SCREENHEIGHT))
       (when (and (fx= gamestate GS_LEVEL) (not (fx= gametic 0)))
         (hu-erase))
+      ;; (-uncapped: the world between the last two tics, for drawing)
+      (interp-begin! (interp-frac))
       ;; do buffered drawing
       (cond
         [(fx= gamestate GS_LEVEL)
@@ -79,6 +81,7 @@
         (r-render-player-view (vector-ref players displayplayer)))
       (when (and (fx= gamestate GS_LEVEL) (not (fx= gametic 0)))
         (hu-drawer))
+      (interp-end!)
       ;; clean up border stuff
       (when (and (not (fx= gamestate oldgamestate)) (not (fx= gamestate GS_LEVEL)))
         (i-set-palette (w-cache-lump-name "PLAYPAL")))
@@ -126,6 +129,14 @@
                           (loop nowtime))))))))))))
 
 ;; D_DoomLoop
+;; -uncapped: how far into the next tic the display is, 0 to FRACUNIT:
+;; the time since the last tic ran. (Timedemos show each tic as it is.)
+(define lasttic-ms 0)
+(define (interp-frac)
+  (if singletics
+      FRACUNIT
+      (fxmin FRACUNIT (fxquotient (fx* (fx- (i-get-time-ms) lasttic-ms) (fx* 35 FRACUNIT)) 1000))))
+
 (define (d-doom-loop)
   (when demorecording
     (g-begin-recording))
@@ -265,6 +276,8 @@
   (set! respawnparm (fx> (m-check-parm "-respawn") 0))
   (set! fastparm (fx> (m-check-parm "-fast") 0))
   (set! devparm (fx> (m-check-parm "-devparm") 0))
+  ;; -uncapped: draw as often as the display allows, interpolating
+  (set! interp-enabled (fx> (m-check-parm "-uncapped") 0))
   (cond [(fx> (m-check-parm "-altdeath") 0) (set! deathmatch 2)]
         [(fx> (m-check-parm "-deathmatch") 0) (set! deathmatch 1)])
   (printf "~a\n"

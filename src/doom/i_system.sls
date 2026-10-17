@@ -1,7 +1,7 @@
 ;;; i_system: fatal errors, quitting, and timing.
 (library (doom i_system)
   (export i-error &doom-error doom-error? i-quit &doom-quit doom-quit?
-          i-get-time i-fake-time i-wait-vbl i-wait-hook)
+          i-get-time i-get-time-ms i-fake-time i-wait-vbl i-wait-hook)
   (import (chezscheme) (doom global))
 
   ;; I_Error: vanilla prints the message and exits. We raise a condition so
@@ -20,7 +20,8 @@
 
   ;; When true, I_GetTime advances one tic per call instead of following the
   ;; clock: runs are repeatable and as fast as the machine allows. (The
-  ;; oracle has the same switch, ORACLE_FAKETIME.)
+  ;; oracle has the same switch, ORACLE_FAKETIME.) A number n makes it one
+  ;; tic every n calls.
   (define-global i-fake-time #f)
   (define faketime 0)
 
@@ -28,12 +29,18 @@
   (define basetime #f)
   (define (i-get-time)
     (if i-fake-time
+        ;; (a number n: one tic every n calls)
         (begin (set! faketime (fx+ faketime 1))
-               (fx- faketime 1))
+               (fxquotient (fx- faketime 1) (if (fixnum? i-fake-time) i-fake-time 1)))
         (let* ([t (current-time 'time-monotonic)]
                [ms (+ (* (time-second t) 1000) (quotient (time-nanosecond t) 1000000))])
           (unless basetime (set! basetime ms))
           (quotient (* (- ms basetime) 35) 1000))))
+
+  ;; Milliseconds on the same clock (for -uncapped's interpolation).
+  (define (i-get-time-ms)
+    (let ([t (current-time 'time-monotonic)])
+      (+ (* (time-second t) 1000) (quotient (time-nanosecond t) 1000000))))
 
   ;; I_WaitVBL: sleep count 70ths of a second (not under fake time),
   ;; calling i-wait-hook (if set) every 70th meanwhile: linuxdoom's sound

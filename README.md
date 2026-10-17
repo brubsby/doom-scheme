@@ -14,6 +14,7 @@ make wad            # fetch + verify the v1.9 shareware doom1.wad into wads/
 make run            # DOOM: title loop, menus (ESC), the shareware episode, sound,
                     # savegames, ~/.doomrc
 make run ARGS="-warp 1 3 -skill 4"   # any of linuxdoom's command line (and -nosound)
+make run ARGS="-uncapped"            # interpolated frames at the display's rate
 make test           # Scheme vs. oracle: the renderer, the playsim, and every
                     # frame and sound buffer of demos, menus, intermission,
                     # finale, saving and loading

@@ -365,8 +365,7 @@
     (set! framecount (fx+ framecount 1))
     (set! validcount (fx+ validcount 1))))
 
-;; R_RenderPlayerView. (C calls NetUpdate between the phases to poll for
-;; network input; that has no effect on the picture.)
+;; R_RenderPlayerView.
 ;; NetUpdate, which d_main (above the renderer) sets: the renderer checks
 ;; for new console commands between its phases.
 (define-global r-net-update (lambda () (void)))

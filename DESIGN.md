@@ -636,7 +636,23 @@ Each milestone ends with something visible or testable.
 Roughly 45k lines of C, about 10k of which is data (`info.c` and `tables.c`) that
 gets generated rather than written.
 
-## Future: hi-res and uncapped
+## Uncapped framerate (`-uncapped`)
+
+With `-uncapped` the main loop doesn't wait for the next tic: `TryRunTics`
+runs whatever tics are ready (possibly none) and the frame is drawn
+anyway, as often as the display allows (vsync). `r_interp` records, at the
+start of every tic, where each thing is (x, y, z, angle), each sector's
+floor and ceiling height, the player's view height and the weapon sprites'
+offsets. Each frame then moves them to prev + frac·(cur − prev), where frac
+is the time since the last tic in tics, draws (the view, the automap, the
+status bar), and puts them back. Something with no record from the last tic
+(just spawned, or a new level) is drawn where it is, and so is anything
+that moved more than 64 units in one tic (a teleport). Timedemos show
+each tic as it is. `tests/uncapped.ss` runs the title loop to gametic 4000
+normally and uncapped (with time slowed down so that most frames see no
+new tic): the simulation matches after every tic.
+
+## Future: hi-res
 
 Neither is built now, but these rules keep both cheap to add later.
 

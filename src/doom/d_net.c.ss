@@ -70,6 +70,8 @@
 (define oldentertics 0)
 
 (define (run-one-tic)
+  (interp-save-tic!)
+  (set! lasttic-ms (i-get-time-ms))
   (when advancedemo
     (d-do-advance-demo))
   (m-ticker)
@@ -92,8 +94,10 @@
                          [else availabletics])]
            [counts (if (fx< counts 1) 1 counts)])
       ;; (the key player does not adapt)
-      ;; wait for new tics if needed
-      (let wait ([lowtic lowtic])
+      ;; wait for new tics if needed (-uncapped: don't wait; run what there
+      ;; is, possibly nothing, and draw another frame)
+      (let wait ([lowtic lowtic]
+                 [counts (if interp-enabled (fxmin counts availabletics) counts)])
         (if (fx< lowtic (fx+ (fxquotient gametic ticdup) counts))
             (begin
               (net-update)
@@ -104,7 +108,7 @@
                 ;; work
                 (if (fx>= (fx- (fxquotient (i-get-time) ticdup) entertic) 20)
                     (m-ticker)
-                    (wait lowtic))))
+                    (wait lowtic counts))))
             ;; run the count * ticdup dics
             (do ([c counts (fx- c 1)]) ((fx= c 0))
               (do ([i 0 (fx+ i 1)]) ((fx= i ticdup))
