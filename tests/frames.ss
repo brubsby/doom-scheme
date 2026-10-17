@@ -403,7 +403,7 @@
     [else
       (for-each
        (lambda (name)
-         (unless (= 0 (system (format "CASE=~a scheme --libdirs src --script tests/frames.ss" name)))
+         (unless (= 0 (system (format "CASE=~a scheme --libdirs src --compile-imported-libraries --script tests/frames.ss" name)))
            (set! failures (+ failures 1))))
        case-names)]))
 (finish)

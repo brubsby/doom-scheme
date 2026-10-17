@@ -90,7 +90,7 @@
       (run-case name)
       (for-each
        (lambda (name)
-         (unless (= 0 (system (format "LOOP_CASE=~a scheme --libdirs src --script tests/loop.ss" name)))
+         (unless (= 0 (system (format "LOOP_CASE=~a scheme --libdirs src --compile-imported-libraries --script tests/loop.ss" name)))
            (set! failures (+ failures 1))))
        '("attract" "demo1" "demo2" "demo3"))))
 (finish)

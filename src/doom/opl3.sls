@@ -323,22 +323,28 @@
                             (fxsrl (ref c s S-EG-KSL) (fxvector-ref kslshift (ref c s S-KSL)))
                             (ref c (ref c s S-TREM))))
       (ref! c s S-PG-RESET (if reset 1 0))
+      ;; (gen2: the generator after this step; a set! of gen here would box
+      ;; it, allocating on every call)
       (let ([inc
              (cond
                [(fx= gen eg-attack)
-                (cond [(fx= rout 0) (set! gen eg-decay) 0]
+                (cond [(fx= rout 0) 0]
                       [(and (fx> key 0) (fx> shift 0) (not (fx= rate-hi #x0f)))
                        (fxsra (fxsll (fxlognot rout) shift) 4)]
                       [else 0])]
                [(fx= gen eg-decay)
-                (cond [(fx= (fxsrl rout 4) (ref c s S-SL)) (set! gen eg-sustain) 0]
+                (cond [(fx= (fxsrl rout 4) (ref c s S-SL)) 0]
                       [(and (not eg-off) (not reset) (fx> shift 0))
                        (fxsll 1 (fx- shift 1))]
                       [else 0])]
                [(and (not eg-off) (not reset) (fx> shift 0)) (fxsll 1 (fx- shift 1))]
-               [else 0])])
+               [else 0])]
+            [gen2 (cond
+                    [(and (fx= gen eg-attack) (fx= rout 0)) eg-decay]
+                    [(and (fx= gen eg-decay) (fx= (fxsrl rout 4) (ref c s S-SL))) eg-sustain]
+                    [else gen])])
         (ref! c s S-EG-ROUT (fxlogand (fx+ base-rout inc) #x1ff))
-        (ref! c s S-EG-GEN (cond [(fx= key 0) eg-release] [reset eg-attack] [else gen])))))
+        (ref! c s S-EG-GEN (cond [(fx= key 0) eg-release] [reset eg-attack] [else gen2])))))
 
   ;;
   ;; Phase generator

@@ -1,5 +1,9 @@
 # Top-level tasks. Run inside `nix develop`.
 
+# Libraries compile to src/doom/*.so on first use and recompile when they
+# (or files they include) change.
+SCHEME := scheme --libdirs src --compile-imported-libraries
+
 TRACES := $(foreach d,demo1 demo2 demo3,build/oracle/$(d).trace)
 
 all: oracle-traces
@@ -60,12 +64,12 @@ test: wads/doom1.wad build/oracle/fixed-cases.txt build/oracle/tables.txt build/
       build/oracle/levels/.stamp build/oracle/render/.stamp build/oracle/demos/.stamp \
       build/oracle/attract.trace $(TRACES)
 	@for t in tests/*.ss; do [ $$t = tests/lib.ss ] && continue; \
-	  echo "== $$t"; scheme --libdirs src --script $$t || exit 1; done
+	  echo "== $$t"; $(SCHEME) --script $$t || exit 1; done
 
 run:
-	scheme --libdirs src --script src/main.ss $(ARGS)
+	$(SCHEME) --script src/main.ss $(ARGS)
 
 clean:
-	rm -rf build
+	rm -rf build src/doom/*.so src/doom/*.wpo
 
 .PHONY: all wad oracle oracle-traces info test run clean FORCE

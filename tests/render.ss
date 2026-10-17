@@ -100,6 +100,6 @@
   (if m
       (run-map (string->number m))
       (do ([m 1 (+ m 1)]) ((> m 9))
-        (unless (= 0 (system (format "MAP=~a scheme --libdirs src --script tests/render.ss" m)))
+        (unless (= 0 (system (format "MAP=~a scheme --libdirs src --compile-imported-libraries --script tests/render.ss" m)))
           (set! failures (+ failures 1))))))
 (finish)

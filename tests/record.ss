@@ -90,7 +90,7 @@
 (set! headless #t)                      ; no audio device either
 (set! i-fake-time #t)
 
-(define (run case) (system (format "REC_CASE=~a scheme --libdirs src --script tests/record.ss" case)))
+(define (run case) (system (format "REC_CASE=~a scheme --libdirs src --compile-imported-libraries --script tests/record.ss" case)))
 
 (case (getenv "REC_CASE")
   [("record")
@@ -113,7 +113,7 @@
    (check "oracle playback"
           0 (system "DEMODIR=build/test tools/oracle/run.sh rec build/test/rec.trace > /dev/null"))
    (check "port playback"
-          0 (system "cd build/test && DOOMWADDIR=../../wads REC_CASE=play scheme --libdirs ../../src --script ../../tests/record.ss"))
+          0 (system "cd build/test && DOOMWADDIR=../../wads REC_CASE=play scheme --libdirs ../../src --compile-imported-libraries --script ../../tests/record.ss"))
    (let ([recorded (read-trace "build/test/rec-record.trace")]
          [oracle (map select (read-trace "build/test/rec.trace"))]
          [played (read-trace "build/test/rec-play.trace")])
