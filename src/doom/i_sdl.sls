@@ -16,7 +16,11 @@
           sdl-event-mouse-xrel sdl-event-mouse-yrel sdl-event-mouse-button
           AUDIO_S16LSB sdl-init-sub-system sdl-open-audio-device sdl-close-audio-device
           sdl-pause-audio-device sdl-queue-audio sdl-get-queued-audio-size
-          sdl-clear-queued-audio sdl-set-relative-mouse-mode sdl-push-event)
+          sdl-clear-queued-audio sdl-set-relative-mouse-mode sdl-push-event
+          SDL_INIT_GAMECONTROLLER SDL_CONTROLLERAXISMOTION SDL_CONTROLLERBUTTONDOWN
+          SDL_CONTROLLERBUTTONUP sdl-num-joysticks sdl-is-game-controller
+          sdl-game-controller-open sdl-event-caxis-axis sdl-event-caxis-value
+          sdl-event-cbutton-button)
   (import (chezscheme))
 
   (define lib (load-shared-object "libSDL2-2.0.so.0"))
@@ -95,6 +99,18 @@
 
   (define sdl-set-relative-mouse-mode (foreign-procedure "SDL_SetRelativeMouseMode" (int) int))
   (define sdl-push-event (foreign-procedure "SDL_PushEvent" (u8*) int))
+
+  ;; Game controllers (the Xbox-style mapping SDL gives any known pad).
+  (define SDL_INIT_GAMECONTROLLER #x2000)
+  (define SDL_CONTROLLERAXISMOTION #x650)
+  (define SDL_CONTROLLERBUTTONDOWN #x651)
+  (define SDL_CONTROLLERBUTTONUP #x652)
+  (define sdl-num-joysticks (foreign-procedure "SDL_NumJoysticks" () int))
+  (define sdl-is-game-controller (foreign-procedure "SDL_IsGameController" (int) boolean))
+  (define sdl-game-controller-open (foreign-procedure "SDL_GameControllerOpen" (int) uptr))
+  (define (sdl-event-caxis-axis ev) (bytevector-u8-ref ev 12))            ; caxis.axis
+  (define (sdl-event-caxis-value ev) (bytevector-s16-native-ref ev 16))   ; caxis.value
+  (define (sdl-event-cbutton-button ev) (bytevector-u8-ref ev 12))        ; cbutton.button
 
   ;; SDL_Event is a 56-byte union; we read the few fields we need by offset.
   (define (make-sdl-event) (make-bytevector 56 0))

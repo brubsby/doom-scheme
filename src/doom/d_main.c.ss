@@ -149,6 +149,7 @@
       (set! debugfile (open-file-output-port filename (file-options no-fail)
                                              (buffer-mode line) (native-transcoder)))))
   (unless nodrawers
+    (set! joystick-enabled (not (fx= usejoystick 0)))
     (i-init-graphics))
   (let loop ()
     ;; frame syncronous IO operations

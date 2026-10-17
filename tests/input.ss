@@ -2,7 +2,8 @@
 ;;; own event queue (SDL_PushEvent, dummy video driver): keys by
 ;;; linuxdoom's xlatekey table, and the mouse as linuxdoom's X11 code posts
 ;;; it (button bits 1/2/4, a press or'ed into the buttons held and a
-;;; release xor'ed, motion as dx<<2 and -dy<<2).
+;;; release xor'ed, motion as dx<<2 and -dy<<2), and a game controller's
+;;; as DOOM's digital joystick.
 (import (chezscheme) (doom i_sdl) (doom i_video) (doom d_event) (doom doomdef))
 (load "tests/lib.ss")
 
@@ -17,7 +18,8 @@
         (let ([off (car f)] [kind (cadr f)] [v (caddr f)])
           (case kind
             [(u8) (bytevector-u8-set! ev off v)]
-            [(s32) (bytevector-s32-native-set! ev off v)])
+            [(s32) (bytevector-s32-native-set! ev off v)]
+            [(s16) (bytevector-s16-native-set! ev off v)])
           (loop (cdddr f)))))
     (sdl-push-event ev)))
 (define (key type sym) (sdl-event type 20 's32 sym))
@@ -45,6 +47,19 @@
 (check "mouse: buttons held and pressed, motion scaled by 4 with y up"
        `((,ev_mouse 1 0 0) (,ev_mouse 1 12 8) (,ev_mouse 5 0 0) (,ev_mouse 4 0 0)
          (,ev_mouse 4 -4 0) (,ev_mouse 0 0 0) (,ev_mouse 2 0 0) (,ev_mouse 0 0 0))
+       (events))
+
+(define (cbutton type b) (sdl-event type 12 'u8 b 13 'u8 (if (= type SDL_CONTROLLERBUTTONDOWN) 1 0)))
+(define (caxis a v) (sdl-event SDL_CONTROLLERAXISMOTION 12 'u8 a 16 's16 v))
+(cbutton SDL_CONTROLLERBUTTONDOWN 0) (caxis 1 -20000) (caxis 1 -25000) (caxis 0 3000)
+(caxis 0 30000) (cbutton SDL_CONTROLLERBUTTONDOWN 13) (caxis 5 30000)
+(cbutton SDL_CONTROLLERBUTTONUP 0) (caxis 5 0) (caxis 1 0) (caxis 0 0)
+(cbutton SDL_CONTROLLERBUTTONUP 13) (cbutton SDL_CONTROLLERBUTTONDOWN 6)
+(cbutton SDL_CONTROLLERBUTTONDOWN 3) (caxis 4 32767)
+(check "game controller: buttons, the stick past its dead zone, the d-pad, triggers, start"
+       `((,ev_joystick 1 0 0) (,ev_joystick 1 0 -1) (,ev_joystick 1 1 -1) (,ev_joystick 1 -1 -1)
+         (,ev_joystick 0 -1 -1) (,ev_joystick 0 -1 0) (,ev_joystick 0 0 0)
+         (,ev_keydown ,KEY_ESCAPE 0 0) (,ev_joystick 8 0 0) (,ev_joystick 12 0 0))
        (events))
 
 (sdl-quit)

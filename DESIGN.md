@@ -234,7 +234,12 @@ procedures using `(endianness little)`, so no `m_swap` is needed.
   correction (4:3).
 - **Input:** SDL events become `event_t` (`ev_keydown`/`ev_keyup`/`ev_mouse`)
   and get fed to `D_PostEvent`. The key mapping comes from `i_video.c`'s
-  `xlatekey`.
+  `xlatekey`, and the mouse is linuxdoom's X11 code's (`-grabmouse`). The
+  game reads `ev_joystick` too, which linuxdoom's X11 code never posts;
+  with `use_joystick 1` in the config, a game controller does: the left
+  stick or d-pad as DOOM's digital axes, A/B/X/Y as joystick buttons 0-3
+  (the triggers as 0 and 2: fire and run), Start and Back as Escape and
+  Tab. `tests/input.ss` checks all three through SDL's own event queue.
 - **Timing:** `I_GetTime` returns tics at 35 Hz from `SDL_GetTicks`.
 - **Sound:** SFX mixing is done in Scheme by a port of linuxdoom's sound
   server (11025 Hz, 16-bit stereo, 512-sample buffers). The mix is pushed

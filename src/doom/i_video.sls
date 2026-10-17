@@ -4,7 +4,7 @@
 (library (doom i_video)
   (export i-init-graphics i-shutdown-graphics i-set-palette i-finish-update
           i-read-pixels i-poll-events i-xlate-key i-get-events i-start-tic i-start-frame
-          i-update-no-blit last-palette headless grabmouse)
+          i-update-no-blit last-palette headless grabmouse joystick-enabled)
   (import (chezscheme) (doom global) (doom i_sdl) (doom doomdef) (doom v_video) (doom d_event) (doom i_system) (doom doomstat) (doom m_argv))
 
   (define window 0)
@@ -24,6 +24,8 @@
   (define-global headless #f)
   ;; -grabmouse (see I_GetEvent)
   (define-global grabmouse #f)
+  ;; use_joystick (d_main sets this from the config before I_InitGraphics)
+  (define-global joystick-enabled #f)
 
   (define (i-init-graphics)
     (unless headless (init-graphics)))
@@ -44,6 +46,13 @@
     ;; it), as linuxdoom grabs and recenters it
     (set! grabmouse (fx> (m-check-parm "-grabmouse") 0))
     (when grabmouse (sdl-set-relative-mouse-mode 1))
+    ;; use_joystick: the first game controller SDL knows
+    (when (and joystick-enabled (>= (sdl-init-sub-system SDL_INIT_GAMECONTROLLER) 0))
+      (let loop ([i 0])
+        (when (fx< i (sdl-num-joysticks))
+          (if (sdl-is-game-controller i)
+              (sdl-game-controller-open i)
+              (loop (fx+ i 1))))))
     (set! texture (check 'sdl-create-texture
                          (sdl-create-texture renderer SDL_PIXELFORMAT_ARGB8888
                                              SDL_TEXTUREACCESS_STREAMING
@@ -170,6 +179,56 @@
   ;; one released, and motion the buttons held, with data2 = dx<<2 and
   ;; data3 = -dy<<2 (unless both are 0).
   (define mousebuttons 0)                ; held, as X's state mask
+
+  ;; The joystick, which linuxdoom's X11 code never read but the game does
+  ;; (G_Responder): an ev_joystick with data1 the buttons (bits 1, 2, 4, 8:
+  ;; the config's joyb_* numbers 0-3) and data2/data3 the x and y axes,
+  ;; -1, 0 or 1 (DOOM's joystick is digital), posted when any of them
+  ;; changes. From a game controller: the left stick (past a dead zone) or
+  ;; the d-pad are the axes; A, B, X, Y are buttons 0-3, and the right and
+  ;; left triggers are buttons 0 and 2 too (fire and run, by default).
+  ;; Start and Back are the Escape and Tab keys (the menu, the automap).
+  (define JOYDEADZONE 8000)
+  (define joybuttons 0)
+  (define stick (make-fxvector 2 0))    ; left stick x, y
+  (define dpad (make-fxvector 4 0))     ; up, down, left, right
+  (define triggers (make-fxvector 2 0)) ; left, right
+  (define lastjoy (list 0 0 0))
+  (define (joy-axis neg pos stickv)
+    (cond [(or (fx= neg 1) (fx< stickv (fx- 0 JOYDEADZONE))) -1]
+          [(or (fx= pos 1) (fx> stickv JOYDEADZONE)) 1]
+          [else 0]))
+  (define (post-joystick post)
+    (let* ([buttons (fxior joybuttons
+                           (if (fx= (fxvector-ref triggers 1) 1) 1 0)
+                           (if (fx= (fxvector-ref triggers 0) 1) 4 0))]
+           [x (joy-axis (fxvector-ref dpad 2) (fxvector-ref dpad 3) (fxvector-ref stick 0))]
+           [y (joy-axis (fxvector-ref dpad 0) (fxvector-ref dpad 1) (fxvector-ref stick 1))]
+           [now (list buttons x y)])
+      (unless (equal? now lastjoy)
+        (set! lastjoy now)
+        (post (make-event ev_joystick buttons x y)))))
+  (define (controller-button ev post down?)
+    (let ([b (sdl-event-cbutton-button ev)])
+      (case b
+        [(0 1 2 3)                      ; A B X Y
+         (set! joybuttons (if down?
+                              (fxior joybuttons (fxsll 1 b))
+                              (fxand joybuttons (fxnot (fxsll 1 b)))))
+         (post-joystick post)]
+        [(11 12 13 14)                  ; d-pad up, down, left, right
+         (fxvector-set! dpad (fx- b 11) (if down? 1 0))
+         (post-joystick post)]
+        [(6) (post (make-event (if down? ev_keydown ev_keyup) KEY_ESCAPE 0 0))] ; start
+        [(4) (post (make-event (if down? ev_keydown ev_keyup) KEY_TAB 0 0))]    ; back
+        [else (void)])))
+  (define (controller-axis ev post)
+    (let ([a (sdl-event-caxis-axis ev)] [v (sdl-event-caxis-value ev)])
+      (case a
+        [(0 1) (fxvector-set! stick a v)]                         ; left stick
+        [(4 5) (fxvector-set! triggers (fx- a 4) (if (fx> v 16000) 1 0))] ; triggers
+        [else (void)])
+      (post-joystick post)))
   (define (button-bit b) (case b [(1) 1] [(2) 2] [(3) 4] [else 0]))
   (define (i-get-events post)
     (i-poll-events
@@ -189,6 +248,9 @@
             (let ([b (button-bit (sdl-event-mouse-button ev))])
               (post (make-event ev_mouse (fxxor mousebuttons b) 0 0))
               (set! mousebuttons (fxand mousebuttons (fxnot b))))]
+           [(fx= type SDL_CONTROLLERBUTTONDOWN) (controller-button ev post #t)]
+           [(fx= type SDL_CONTROLLERBUTTONUP) (controller-button ev post #f)]
+           [(fx= type SDL_CONTROLLERAXISMOTION) (controller-axis ev post)]
            [(fx= type SDL_MOUSEMOTION)
             (let ([dx (fxsll (sdl-event-mouse-xrel ev) 2)]
                   [dy (fxsll (fx- 0 (sdl-event-mouse-yrel ev)) 2)])
