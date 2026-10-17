@@ -18,6 +18,9 @@
    ;; r_draw
    viewwidth scaledviewwidth viewheight viewwindowx viewwindowy
    r-fill-back-screen r-draw-view-border r-video-erase
+   ;; -hires
+   r-set-hires! rwidth rheight hires-shift
+   view2d-x view2d-y view2d-width view2d-scaledwidth view2d-height
    ;; r_sky
    SKYFLATNAME skyflatnum skytexture
    ;; r_things
@@ -30,6 +33,25 @@
 
   ;; Garbage-read tracking, for tests (see r_things.c.ss and r_draw.c.ss).
   (define-global garbage-mask #f)
+
+  ;; The renderer's resolution (-hires k): rwidth x rheight, k = 2^hires-shift
+  ;; times 320x200, drawn into rbuf. At k = 1 rbuf is `screens` (screen 0)
+  ;; and everything is as in C. The 2D layer (status bar, menus, messages,
+  ;; automap, border) stays 320x200 in screens; see "Hi-res" in DESIGN.md.
+  (define-global rwidth SCREENWIDTH)
+  (define-global rheight SCREENHEIGHT)
+  (define-global hires-shift 0)
+  (define-global rbuf screens)
+  ;; The largest the renderer's arrays need to be (k = 4).
+  (define MAXWIDTH 1280)
+  (define MAXHEIGHT 832)
+  ;; The view window in 320x200 coordinates, for the 2D layer (the border,
+  ;; the heads-up erase, the pause sign): viewwindowx etc. divided by k.
+  (define-global view2d-x 0)
+  (define-global view2d-y 0)
+  (define-global view2d-width 0)
+  (define-global view2d-scaledwidth 0)
+  (define-global view2d-height 0)
 
   (include "r_main.c.ss")
   (include "r_draw.c.ss")

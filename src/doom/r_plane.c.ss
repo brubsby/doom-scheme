@@ -2,23 +2,26 @@
 
 (define MAXVISPLANES 128)
 
-;; visplane_t. top and bottom are bytevectors of SCREENWIDTH+2 indexed from
-;; -1 (use vp-ref / vp-set!): C pads both arrays with a byte on each side,
-;; and R_DrawPlanes reads and writes top[minx-1] and top[maxx+1]. Only
-;; top[0..SCREENWIDTH-1] is ever reset, so the pads and bottom[] keep
-;; whatever earlier frames left, as in C.
+;; visplane_t. top and bottom are arrays of rwidth+2 indexed from -1 (use
+;; vp-ref / vp-set!): C pads both arrays with an entry on each side, and
+;; R_DrawPlanes reads and writes top[minx-1] and top[maxx+1]. Only
+;; top[0..rwidth-1] is ever reset, so the pads and bottom[] keep whatever
+;; earlier frames left, as in C. C's entries are unsigned chars, and 0xff
+;; marks an empty column; with -hires (rows past 255) they are 16 bits and
+;; 0xffff marks it.
 (define-struct visplane ()
   (height 0) (picnum 0) (lightlevel 0) (minx 0) (maxx 0)
-  (top (make-bytevector (fx+ SCREENWIDTH 2) 0))
-  (bottom (make-bytevector (fx+ SCREENWIDTH 2) 0)))
+  (top (make-fxvector (fx+ MAXWIDTH 2) 0))
+  (bottom (make-fxvector (fx+ MAXWIDTH 2) 0)))
+(define vp-empty #xff)
 (define-syntax vp-ref
-  (syntax-rules () [(_ bv x) (bytevector-u8-ref bv (fx+ x 1))]))
+  (syntax-rules () [(_ v x) (fxvector-ref v (fx+ x 1))]))
 (define-syntax vp-set!
-  (syntax-rules () [(_ bv x v) (bytevector-u8-set! bv (fx+ x 1) (fxand v 255))]))
+  (syntax-rules () [(_ v x val) (fxvector-set! v (fx+ x 1) (fxand val vp-empty))]))
 (define (vp-clear-top! pl)
   (let ([top (visplane-top pl)])
-    (do ([i 1 (fx+ i 1)]) ((fx> i SCREENWIDTH))
-      (bytevector-u8-set! top i #xff))))
+    (do ([i 1 (fx+ i 1)]) ((fx> i rwidth))
+      (fxvector-set! top i vp-empty))))
 
 (define visplanes
   (let ([v (make-vector MAXVISPLANES)])
@@ -31,36 +34,37 @@
 ;; The short arrays that drawsegs and sprites point into (negonearray,
 ;; screenheightarray, R_DrawSprite's clipbot/cliptop, openings) are
 ;; slices of one fxvector, clipmem; a C `short*` into them is an offset.
-;; In C they are separate arrays.
-(define MAXOPENINGS (* SCREENWIDTH 64))
+;; In C they are separate arrays. (Sized for -hires; C's openings[] holds
+;; SCREENWIDTH*64, maxopenings.)
+(define (maxopenings) (fx* rwidth 64))
 (define negonearray 0)
-(define screenheightarray SCREENWIDTH)
-(define clipbot (* 2 SCREENWIDTH))
-(define cliptop (* 3 SCREENWIDTH))
-(define openings (* 4 SCREENWIDTH))
-(define clipmem (make-fxvector (fx+ openings MAXOPENINGS) 0))
+(define screenheightarray MAXWIDTH)
+(define clipbot (* 2 MAXWIDTH))
+(define cliptop (* 3 MAXWIDTH))
+(define openings (* 4 MAXWIDTH))
+(define clipmem (make-fxvector (fx+ openings (* MAXWIDTH 64)) 0))
 (define lastopening openings)
 (define (s16 x) (fx- (fxand (fx+ x #x8000) #xFFFF) #x8000))
 
 ;; Clip values are the solid pixel bounding the range.
 ;; floorclip starts out SCREENHEIGHT, ceilingclip starts out -1.
-(define floorclip (make-fxvector SCREENWIDTH 0))
-(define ceilingclip (make-fxvector SCREENWIDTH 0))
+(define floorclip (make-fxvector MAXWIDTH 0))
+(define ceilingclip (make-fxvector MAXWIDTH 0))
 
 ;; spanstart holds the start of a plane span, initialized to 0 at start.
-(define spanstart (make-fxvector SCREENHEIGHT 0))
+(define spanstart (make-fxvector MAXHEIGHT 0))
 
 ;; texture mapping
 (define planezlight (vector-ref zlight 0))
 (define planeheight 0)
-(define yslope (make-fxvector SCREENHEIGHT 0))
-(define distscale (make-fxvector SCREENWIDTH 0))
+(define yslope (make-fxvector MAXHEIGHT 0))
+(define distscale (make-fxvector MAXWIDTH 0))
 (define basexscale 0)
 (define baseyscale 0)
-(define cachedheight (make-fxvector SCREENHEIGHT 0))
-(define cacheddistance (make-fxvector SCREENHEIGHT 0))
-(define cachedxstep (make-fxvector SCREENHEIGHT 0))
-(define cachedystep (make-fxvector SCREENHEIGHT 0))
+(define cachedheight (make-fxvector MAXHEIGHT 0))
+(define cacheddistance (make-fxvector MAXHEIGHT 0))
+(define cachedxstep (make-fxvector MAXHEIGHT 0))
+(define cachedystep (make-fxvector MAXHEIGHT 0))
 
 ;; R_InitPlanes: only at game startup.
 (define (r-init-planes)
@@ -140,7 +144,7 @@
            (visplane-height-set! check height)
            (visplane-picnum-set! check picnum)
            (visplane-lightlevel-set! check lightlevel)
-           (visplane-minx-set! check SCREENWIDTH)
+           (visplane-minx-set! check rwidth)
            (visplane-maxx-set! check -1)
            (vp-clear-top! check)
            check)]))))
@@ -157,7 +161,7 @@
     (let ([top (visplane-top pl)])
       (if (let loop ([x intrl])
             (cond [(fx> x intrh) #t]
-                  [(not (fx= (vp-ref top x) #xff)) #f]
+                  [(not (fx= (vp-ref top x) vp-empty)) #f]
                   [else (loop (fx+ x 1))]))
           ;; use the same one
           (begin (visplane-minx-set! pl unionl)
@@ -199,7 +203,7 @@
     (i-error "R_DrawPlanes: drawsegs overflow (~a)" ds-p))
   (when (fx> lastvisplane MAXVISPLANES)
     (i-error "R_DrawPlanes: visplane overflow (~a)" lastvisplane))
-  (when (fx> (fx- lastopening openings) MAXOPENINGS)
+  (when (fx> (fx- lastopening openings) (maxopenings))
     (i-error "R_DrawPlanes: opening overflow (~a)" (fx- lastopening openings)))
   (do ([i 0 (fx+ i 1)]) ((fx= i lastvisplane))
     (let* ([pl (vector-ref visplanes i)]
@@ -235,8 +239,8 @@
                  (vector-ref zlight (cond [(fx>= light LIGHTLEVELS) (fx- LIGHTLEVELS 1)]
                                           [(fx< light 0) 0]
                                           [else light]))))
-         (vp-set! top (fx+ maxx 1) #xff)
-         (vp-set! top (fx- minx 1) #xff)
+         (vp-set! top (fx+ maxx 1) vp-empty)
+         (vp-set! top (fx- minx 1) vp-empty)
          (do ([x minx (fx+ x 1)]) ((fx> x (fx+ maxx 1)))
            (r-make-spans x (vp-ref top (fx- x 1)) (vp-ref bottom (fx- x 1))
                          (vp-ref top x) (vp-ref bottom x)))]))))

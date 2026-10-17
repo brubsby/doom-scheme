@@ -10,7 +10,8 @@
   (export screens screen-base gammatable usegamma dirtybox
           v-init v-mark-rect v-copy-rect v-draw-patch v-draw-patch-flipped
           v-draw-patch-direct v-draw-block v-get-block
-          patch-width patch-height patch-leftoffset patch-topoffset patch-columnofs)
+          patch-width patch-height patch-leftoffset patch-topoffset patch-columnofs
+          hires-k hires-buf hires-view overlay-mask)
   (import (chezscheme) (doom global) (doom doomdef) (doom i_system)
           (doom m_bbox) (doom v_video_data))
 
@@ -20,6 +21,23 @@
 
   (define-global usegamma 0)
   (define dirtybox (make-box))
+
+  ;; -hires: the renderer draws the view at k times the resolution into
+  ;; hires-buf, and when it has this frame, hires-view is its window there,
+  ;; (x y width height). It also leaves a downscaled copy in screen 0, so
+  ;; screen 0 is always the whole picture at 320x200. 2D drawing into screen
+  ;; 0 marks overlay-mask, which the renderer clears over the view window:
+  ;; I_FinishUpdate shows the hi-res view except where 2D drawing covers it.
+  (define-global hires-k 1)
+  (define-global hires-buf #f)
+  (define-global hires-view #f)
+  (define-global overlay-mask #f)
+  (define (mark-overlay! dest w h)
+    (let ([mask overlay-mask])
+      (when (and mask (fx< dest screensize))
+        (do ([r 0 (fx+ r 1)] [d dest (fx+ d SCREENWIDTH)]) ((fx= r h))
+          (do ([i 0 (fx+ i 1)]) ((fx= i w))
+            (bytevector-u8-set! mask (fx+ d i) 1))))))
 
   ;; patch_t header: width, height, leftoffset, topoffset (all int16), then
   ;; int32 columnofs[width] relative to the start of the patch.
@@ -47,6 +65,7 @@
     (check-rect "V_CopyRect" srcx srcy width height srcscrn)
     (check-rect "V_CopyRect" destx desty width height destscrn)
     (v-mark-rect destx desty width height)
+    (when (fx= destscrn 0) (mark-overlay! (fx+ (fx* SCREENWIDTH desty) destx) width height))
     (let loop ([h height]
                [src (fx+ (screen-base srcscrn) (fx* SCREENWIDTH srcy) srcx)]
                [dest (fx+ (screen-base destscrn) (fx* SCREENWIDTH desty) destx)])
@@ -58,6 +77,7 @@
   ;; A column is a list of posts: topdelta (0xff ends), length, pad,
   ;; length bytes of pixels, pad.
   (define (draw-columns patch desttop w column-of)
+   (let ([mask (and (fx< desttop screensize) overlay-mask)])
     (do ([col 0 (fx+ col 1)]) ((fx= col w))
       (let post ([c (patch-columnofs patch (column-of col))])
         (let ([topdelta (bytevector-u8-ref patch c)])
@@ -68,8 +88,9 @@
                        [dest (fx+ desttop col (fx* topdelta SCREENWIDTH))])
                 (when (fx< i len)
                   (bytevector-u8-set! screens dest (bytevector-u8-ref patch src))
+                  (when mask (bytevector-u8-set! mask dest 1))
                   (px (fx+ i 1) (fx+ src 1) (fx+ dest SCREENWIDTH))))
-              (post (fx+ c len 4))))))))
+              (post (fx+ c len 4)))))))))
 
   ;; V_DrawPatch: masked draw. Out-of-bounds patches are reported and skipped
   ;; (RANGECHECK is on in linuxdoom; "what is up with TNT.WAD?").
@@ -113,6 +134,7 @@
       [(x y scrn width height src src-offset)
        (check-rect "V_DrawBlock" x y width height scrn)
        (v-mark-rect x y width height)
+       (when (fx= scrn 0) (mark-overlay! (fx+ (fx* y SCREENWIDTH) x) width height))
        (let loop ([h height] [s src-offset]
                   [dest (fx+ (screen-base scrn) (fx* y SCREENWIDTH) x)])
          (when (fx> h 0)

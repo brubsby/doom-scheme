@@ -62,7 +62,7 @@
 (define-syntax scale-light-index
   (syntax-rules ()
     [(_ scale)
-     (let ([index (fxsra scale LIGHTSCALESHIFT)])
+     (let ([index (fxsra scale (fx+ LIGHTSCALESHIFT hires-shift))])
        (if (fx< -1 index MAXLIGHTSCALE) index (fx- MAXLIGHTSCALE 1)))]))
 
 ;; R_RenderMaskedSegRange

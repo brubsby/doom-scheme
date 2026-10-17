@@ -149,7 +149,7 @@
 
 ;; R_InitSprites: called at program start.
 (define (r-init-sprites namelist)
-  (do ([i 0 (fx+ i 1)]) ((fx= i SCREENWIDTH))
+  (do ([i 0 (fx+ i 1)]) ((fx= i MAXWIDTH))
     (fxvector-set! clipmem (fx+ negonearray i) -1))
   (r-init-sprite-defs namelist))
 
@@ -183,8 +183,8 @@
   (cond
     [clip-lo (not (fx<= clip-lo x clip-hi))]
     [(or (fx= base negonearray) (fx= base screenheightarray))
-     (not (fx< -1 x SCREENWIDTH))]
-    [else (not (fx<= openings (fx+ base x) (fx+ openings MAXOPENINGS -1)))]))
+     (not (fx< -1 x rwidth))]
+    [else (not (fx<= openings (fx+ base x) (fx+ openings (maxopenings) -1)))]))
 
 (define (mark-garbage!)
   (let ([mask garbage-mask])
@@ -343,7 +343,7 @@
                          [(fxlogtest (mobj-frame thing) FF_FULLBRIGHT) 0]
                          ;; diminished light
                          [else
-                          (let ([index (fxsra xscale (fx- LIGHTSCALESHIFT detailshift))])
+                          (let ([index (fxsra xscale (fx- (fx+ LIGHTSCALESHIFT hires-shift) detailshift))])
                             (fxvector-ref spritelights (if (fx>= index MAXLIGHTSCALE)
                                                            (fx- MAXLIGHTSCALE 1)
                                                            index)))])))))))))))))
@@ -437,7 +437,7 @@
   (set! mfloorclip screenheightarray)
   (set! mceilingclip negonearray)
   (set! clip-lo 0)
-  (set! clip-hi (fx- SCREENWIDTH 1))
+  (set! clip-hi (fx- rwidth 1))
   ;; add all active psprites
   (vector-for-each
    (lambda (psp) (when (pspdef-state psp) (r-draw-psprite psp)))

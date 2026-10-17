@@ -652,26 +652,43 @@ each tic as it is. `tests/uncapped.ss` runs the title loop to gametic 4000
 normally and uncapped (with time slowed down so that most frames see no
 new tic): the simulation matches after every tic.
 
-## Future: hi-res
+## Hi-res (`-hires k`)
 
-Neither is built now, but these rules keep both cheap to add later.
+`-hires 2` or `-hires 4` renders the 3D view at k times 320×200 (640×400 or
+1280×800); everything 2D stays 320×200. Like `-uncapped`, it is a display
+option: the default is the original resolution, which the oracle tests
+check, and `tests/display.ss` runs the title loop with each option (and
+both together) and requires the simulation to match the plain run on every
+tic.
 
-- **Resolution is a parameter, not a literal.** `SCREENWIDTH`, `SCREENHEIGHT`,
-  and everything derived from them (`viewwidth`, `centerx`, `yslope`,
-  `distscale`, the screen-size-dependent tables in `r_main`) are computed in one
-  place at startup. Nothing hardcodes 320, 200, 64000, or 168. Until hi-res
-  lands, the only legal value is 320×200, because the oracle's framebuffer diffs
-  assume it.
-- **2D assets keep 320×200 coordinates.** `v_video`'s patch drawing takes
-  virtual 320×200 coordinates and will scale to the real buffer later, so the
-  menu, HUD, and intermission code never learns the real size.
-- **Separate the simulation from rendering.** The playsim never reads anything
-  render-side, and the renderer only *reads* playsim state. For uncapped
-  framerate we will snapshot each mobj's, sector's, and the player's previous
-  position, angle, and height each tic, then render at `prev + frac·(cur-prev)`,
-  with `frac` from `I_GetTime` sub-tics. Keeping the renderer's inputs on a
-  short, explicit list of fields (gathered in `r_main`'s setup) makes that
-  change local.
-- **Fidelity mode stays the default.** Hi-res and interpolation are display
-  options. They never touch tic logic, so the sync test keeps working with them
-  turned on.
+- **The renderer has its own resolution.** `rwidth` and `rheight` are its
+  width and height and `rbuf` its buffer. At k = 1 `rbuf` is `screens`, and
+  everything is as before. View sizes are the 320×200 ones times k
+  (so the view window, the status bar's height and the border stay aligned
+  to the 2D layer), and `view2d-x` and friends give the window in 320×200
+  for the 2D code that needs it (the border, the heads-up erase, the pause
+  sign).
+- **Scales grow by k, and three things follow.** The light-by-distance
+  index for walls and sprites shifts by log2 k more, the light table takes
+  the view's width at 320×200, and the cap on a wall's scale (64) grows by
+  k too. The zlight table (floors and ceilings) depends on distance only and
+  needs nothing.
+- **Visplane columns are 16 bits.** C's are bytes, with 0xff for an empty
+  column; at k = 1 they still wrap to a byte and use 0xff, and above it they
+  are 16 bits with 0xffff.
+- **The 2D layer composes on top.** After rendering, the view is
+  downscaled into screen 0, so screen 0 is always the whole picture at
+  320×200 (the wipe and screenshots read it), and an overlay mask is cleared
+  over the view window; `v_video`'s drawing into screen 0 marks the mask.
+  `I_FinishUpdate` then shows screen 0 scaled up k times, except that inside
+  the view window, wherever the mask is clear, the pixel comes from the hi-res
+  view. So the menu, messages and the pause sign sit on top of the view as
+  they do in 320×200, and the automap and the wipes are 320×200.
+- **linuxdoom's bugs come along.** `M_ChangeDetail` says low detail is "n.a."
+  but flips `detailLevel` anyway, and the next resize applies it, with
+  `R_DrawSpanLow` drawing spans twice as long: on the bottom row they run
+  past the picture. In C they run into screen 1, so `rbuf` has a second
+  screen's worth of room too.
+
+DEMO1 (`-timedemo`, no display) renders at about 1300 frames a second at
+320×200, 270 at 640×400 and 90 at 1280×800 on the development machine.

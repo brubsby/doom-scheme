@@ -10,6 +10,7 @@
   (define window 0)
   (define renderer 0)
   (define texture 0)
+  ;; The texture's pixels: 320x200, or k times that with -hires.
   (define argb (make-bytevector (* SCREENWIDTH SCREENHEIGHT 4) 0))
   ;; 256 palette entries pre-packed as native-endian ARGB8888 words.
   (define palette32 (make-fxvector 256 0))
@@ -35,11 +36,12 @@
     (set! renderer (check 'sdl-create-renderer
                           (sdl-create-renderer window -1 SDL_RENDERER_PRESENTVSYNC)))
     ;; 320x240 logical size stretches 200 lines to 4:3, like a VGA monitor.
-    (sdl-render-set-logical-size renderer SCREENWIDTH (* SCREENHEIGHT 6/5))
+    (sdl-render-set-logical-size renderer (* SCREENWIDTH hires-k) (* SCREENHEIGHT 6/5 hires-k))
+    (set! argb (make-bytevector (* SCREENWIDTH SCREENHEIGHT 4 hires-k hires-k) 0))
     (set! texture (check 'sdl-create-texture
                          (sdl-create-texture renderer SDL_PIXELFORMAT_ARGB8888
                                              SDL_TEXTUREACCESS_STREAMING
-                                             SCREENWIDTH SCREENHEIGHT))))
+                                             (* SCREENWIDTH hires-k) (* SCREENHEIGHT hires-k)))))
 
   (define (i-shutdown-graphics)
     (unless (eqv? window 0) (sdl-destroy-window window) (set! window 0))
@@ -81,14 +83,34 @@
        (do ([i 0 (fx+ i 2)]) ((fx>= i 40))
          (bytevector-u8-set! screens (fx+ row i) (if (fx< i (fx* tics 2)) #xff 0)))))
    (unless (eqv? window 0)
-    (let ([n (fx* SCREENWIDTH SCREENHEIGHT)])
-      (do ([i 0 (fx+ i 1)]) ((fx= i n))
-        (bytevector-u32-native-set! argb (fxsll i 2)
-                                    (fxvector-ref palette32 (bytevector-u8-ref screens i)))))
-    (sdl-update-texture texture 0 argb (fx* SCREENWIDTH 4))
+    (if (fx= hires-k 1)
+        (let ([n (fx* SCREENWIDTH SCREENHEIGHT)])
+          (do ([i 0 (fx+ i 1)]) ((fx= i n))
+            (bytevector-u32-native-set! argb (fxsll i 2)
+                                        (fxvector-ref palette32 (bytevector-u8-ref screens i)))))
+        (compose-hires))
+    (sdl-update-texture texture 0 argb (fx* SCREENWIDTH hires-k 4))
     (sdl-render-clear renderer)
     (sdl-render-copy renderer texture 0 0)
     (sdl-render-present renderer)))
+
+;; -hires: screen 0 scaled up k times, except that inside the view window
+  ;; (when the renderer drew one this frame) a pixel whose 320x200 pixel no
+  ;; 2D drawing covered comes from the hi-res view.
+  (define (compose-hires)
+    (let* ([k hires-k] [w (fx* SCREENWIDTH k)] [h (fx* SCREENHEIGHT k)]
+           [view hires-view] [buf hires-buf] [mask overlay-mask]
+           [vx (if view (car view) 0)] [vy (if view (cadr view) 0)]
+           [vx2 (if view (fx+ vx (caddr view)) 0)] [vy2 (if view (fx+ vy (cadddr view)) 0)])
+      (do ([y 0 (fx+ y 1)]) ((fx= y h))
+        (let ([lrow (fx* (fxquotient y k) SCREENWIDTH)] [out (fx* y w)]
+              [inview (and view (fx<= vy y) (fx< y vy2))])
+          (do ([x 0 (fx+ x 1)]) ((fx= x w))
+            (let* ([l (fx+ lrow (fxquotient x k))]
+                   [c (if (and inview (fx<= vx x) (fx< x vx2) (fx= 0 (bytevector-u8-ref mask l)))
+                          (bytevector-u8-ref buf (fx+ out x))
+                          (bytevector-u8-ref screens l))])
+              (bytevector-u32-native-set! argb (fxsll (fx+ out x) 2) (fxvector-ref palette32 c))))))))
 
   ;; For tests/screenshots: the whole presented window (physical pixels, so
   ;; including scaling and letterboxing) as ARGB8888 bytes.

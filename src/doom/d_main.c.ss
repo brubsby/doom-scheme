@@ -46,6 +46,8 @@
   (unless nodrawers                     ; for comparative timing / profiling
     (let ([redrawsbar #f]
           [wipe #f])
+      ;; (-hires: no hi-res view until the renderer draws one)
+      (set! hires-view #f)
       ;; change the view size if needed
       (when setsizeneeded
         (r-execute-set-view-size)
@@ -65,12 +67,12 @@
          (unless (fx= gametic 0)
            (when automapactive
              (am-drawer))
-           (when (or wipe (and (not (fx= viewheight 200)) fullscreen))
+           (when (or wipe (and (not (fx= view2d-height 200)) fullscreen))
              (set! redrawsbar #t))
            (when (and inhelpscreensstate (not inhelpscreens))
              (set! redrawsbar #t))      ; just put away the help screen
-           (st-drawer (fx= viewheight 200) redrawsbar)
-           (set! fullscreen (fx= viewheight 200)))]
+           (st-drawer (fx= view2d-height 200) redrawsbar)
+           (set! fullscreen (fx= view2d-height 200)))]
         [(fx= gamestate GS_INTERMISSION) (wi-drawer)]
         [(fx= gamestate GS_FINALE) (f-drawer)]
         [(fx= gamestate GS_DEMOSCREEN) (d-page-drawer)])
@@ -90,7 +92,7 @@
         (set! viewactivestate #f)       ; view was not active
         (r-fill-back-screen))           ; draw the pattern into the back screen
       ;; see if the border needs to be updated to the screen
-      (when (and (fx= gamestate GS_LEVEL) (not automapactive) (not (fx= scaledviewwidth 320)))
+      (when (and (fx= gamestate GS_LEVEL) (not automapactive) (not (fx= view2d-scaledwidth 320)))
         (when (or menuactive menuactivestate (not viewactivestate))
           (set! borderdrawcount 3))
         (unless (fx= borderdrawcount 0)
@@ -103,8 +105,8 @@
       (set! wipegamestate gamestate)
       ;; draw pause pic
       (when paused
-        (v-draw-patch-direct (fx+ viewwindowx (fxquotient (fx- scaledviewwidth 68) 2))
-                             (if automapactive 4 (fx+ viewwindowy 4))
+        (v-draw-patch-direct (fx+ view2d-x (fxquotient (fx- view2d-scaledwidth 68) 2))
+                             (if automapactive 4 (fx+ view2d-y 4))
                              0 (w-cache-lump-name "M_PAUSE")))
       ;; menus go directly to the screen
       (m-drawer)                        ; menu is drawn even on top of everything
@@ -115,6 +117,7 @@
           ;; wipe update
           (begin
             (wipe-end-screen 0 0 SCREENWIDTH SCREENHEIGHT)
+            (set! hires-view #f)          ; (the wipe is all 320x200)
             (let loop ([wipestart (fx- (i-get-time) 1)])
               (let wait ()
                 (let* ([nowtime (i-get-time)]
@@ -276,6 +279,12 @@
   (set! respawnparm (fx> (m-check-parm "-respawn") 0))
   (set! fastparm (fx> (m-check-parm "-fast") 0))
   (set! devparm (fx> (m-check-parm "-devparm") 0))
+  ;; -hires [k]: render the view at k (2 or 4) times 320x200
+  (let ([p (m-check-parm "-hires")])
+    (when (fx> p 0)
+      (r-set-hires! (or (and (fx< p (fx- myargc 1))
+                             (string->number (vector-ref myargv (fx+ p 1))))
+                        2))))
   ;; -uncapped: draw as often as the display allows, interpolating
   (set! interp-enabled (fx> (m-check-parm "-uncapped") 0))
   (cond [(fx> (m-check-parm "-altdeath") 0) (set! deathmatch 2)]

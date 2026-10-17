@@ -105,18 +105,19 @@
     ;; Only erases when NOT in automap and the screen is reduced, and the
     ;; text must either need updating or refreshing (because of a recent
     ;; change back from the automap)
-    (when (and (not automapactive) (not (fx= viewwindowx 0))
+    ;; (in 320x200: the view2d- window)
+    (when (and (not automapactive) (not (fx= view2d-x 0))
                (not (fx= (hu-textline-needsupdate l) 0)))
       (let ([lh (fx+ (patch-height (vector-ref (hu-textline-f l) 0)) 1)])
         (do ([y (hu-textline-y l) (fx+ y 1)]
              [yoffset (fx* (hu-textline-y l) SCREENWIDTH) (fx+ yoffset SCREENWIDTH)])
             ((fx>= y (fx+ (hu-textline-y l) lh)))
-          (if (or (fx< y viewwindowy) (fx>= y (fx+ viewwindowy viewheight)))
+          (if (or (fx< y view2d-y) (fx>= y (fx+ view2d-y view2d-height)))
               (r-video-erase yoffset SCREENWIDTH) ; erase entire line
               (begin
-                (r-video-erase yoffset viewwindowx) ; erase left border
+                (r-video-erase yoffset view2d-x) ; erase left border
                 ;; erase right border
-                (r-video-erase (fx+ yoffset viewwindowx viewwidth) viewwindowx))))))
+                (r-video-erase (fx+ yoffset view2d-x view2d-width) view2d-x))))))
     (unless (fx= (hu-textline-needsupdate l) 0)
       (hu-textline-needsupdate-set! l (fx- (hu-textline-needsupdate l) 1))))
 

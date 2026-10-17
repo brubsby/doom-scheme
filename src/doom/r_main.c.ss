@@ -53,7 +53,7 @@
 
 ;; The xtoviewangle[] table maps a screen pixel to the lowest viewangle
 ;; that maps back to x ranges from clipangle to -clipangle.
-(define xtoviewangle (make-fxvector (fx+ SCREENWIDTH 1) 0))
+(define xtoviewangle (make-fxvector (fx+ MAXWIDTH 1) 0))
 
 ;; Light tables: each row is an fxvector of offsets into `colormaps`.
 ;; walllights, spritelights and planezlight point at one of these rows.
@@ -188,10 +188,11 @@
          [den (fixed-mul rw-distance sinea)])
     (if (fx> den (fxsra num 16))
         (let ([scale (fixed-div num den)])
-          (cond [(fx> scale (* 64 FRACUNIT)) (* 64 FRACUNIT)]
+          ;; (-hires: scales are k times larger, and so is the cap)
+          (cond [(fx> scale (fxsll (* 64 FRACUNIT) hires-shift)) (fxsll (* 64 FRACUNIT) hires-shift)]
                 [(fx< scale 256) 256]
                 [else scale]))
-        (* 64 FRACUNIT))))
+        (fxsll (* 64 FRACUNIT) hires-shift))))
 
 ;; R_InitTextureMapping
 (define (r-init-texture-mapping)
@@ -265,10 +266,12 @@
 (define (r-execute-set-view-size)
   (set! setsizeneeded #f)
   (if (fx= setblocks 11)
-      (begin (set! scaledviewwidth SCREENWIDTH)
-             (set! viewheight SCREENHEIGHT))
-      (begin (set! scaledviewwidth (fx* setblocks 32))
-             (set! viewheight (fxand (fxquotient (fx* setblocks 168) 10) (fxnot 7)))))
+      (begin (set! scaledviewwidth rwidth)
+             (set! viewheight rheight))
+      ;; (-hires: the 320x200 window, k times larger)
+      (begin (set! scaledviewwidth (fxsll (fx* setblocks 32) hires-shift))
+             (set! viewheight (fxsll (fxand (fxquotient (fx* setblocks 168) 10) (fxnot 7))
+                                     hires-shift))))
   (set! detailshift setdetail)
   (set! viewwidth (fxsra scaledviewwidth detailshift))
   (set! centery (fxquotient viewheight 2))
@@ -314,8 +317,10 @@
           [row (vector-ref scalelight i)])
       (do ([j 0 (fx+ j 1)]) ((fx= j MAXLIGHTSCALE))
         (let* ([level (fx- startmap
+                           ;; (-hires: j indexes scale/k, so the width is
+                           ;; taken at 320x200 too)
                            (fxquotient (fxquotient (fx* j SCREENWIDTH)
-                                                   (fxsll viewwidth detailshift))
+                                                   (fxsra (fxsll viewwidth detailshift) hires-shift))
                                        DISTMAP))]
                [level (cond [(fx< level 0) 0]
                             [(fx>= level NUMCOLORMAPS) (fx- NUMCOLORMAPS 1)]
@@ -388,4 +393,5 @@
   (r-net-update)
   (r-draw-masked)
   ;; Check for new console commands.
-  (r-net-update))
+  (r-net-update)
+  (r-hires-finish-view))
