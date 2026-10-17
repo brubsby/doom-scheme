@@ -172,7 +172,8 @@
 ;; clipping reads there marks the rows its sprite (or masked seg) could
 ;; draw on, across the whole width; tests/render.ss allows differences from
 ;; the oracle only in marked pixels. See DESIGN.md, "Garbage reads".
-(define-global garbage-mask #f)
+;; (garbage-mask itself is defined in r_local.sls, ahead of r_draw, whose
+;; column drawers also mark pixels read from past the end of a source.)
 (define clip-lo 0)              ; valid clip index range for sprites,
 (define clip-hi -1)             ;   or clip-lo = #f for masked segs
 (define garbage-top 0)          ; rows to mark

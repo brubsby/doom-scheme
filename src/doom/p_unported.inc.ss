@@ -24,3 +24,8 @@
 ;; AM_Stop, for P_KillMobj (the automap is above the playsim; am_map sets
 ;; this when it loads).
 (define-global am-stop-hook (lambda () (void)))
+
+;; ST_Start and HU_Start, for P_SpawnPlayer (the front end is above the
+;; playsim; d_main sets these when it loads).
+(define-global st-start-hook (lambda () (void)))
+(define-global hu-start-hook (lambda () (void)))

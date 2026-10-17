@@ -81,6 +81,10 @@
 (set! gamemode shareware)
 (r-init 11 0)
 (p-init)
+;; (the status bar and heads-up text start with each level; G_Ticker runs
+;; them)
+(st-init)
+(hu-init)
 (set! timingdemo #t)
 
 (for-each

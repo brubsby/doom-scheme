@@ -35,7 +35,6 @@
 
 ;; D_Display: draw current display, possibly wiping it from the previous.
 ;; wipegamestate can be set to -1 to force a wipe on the next draw.
-;; TODO(milestone 7): the wipe (f_wipe) itself.
 (define viewactivestate #f)
 (define menuactivestate #f)
 (define inhelpscreensstate #f)
@@ -54,7 +53,8 @@
         (set! borderdrawcount 3))
       ;; save the current screen if about to wipe
       (unless (fx= gamestate wipegamestate)
-        (set! wipe #t))
+        (set! wipe #t)
+        (wipe-start-screen 0 0 SCREENWIDTH SCREENHEIGHT))
       (when (and (fx= gamestate GS_LEVEL) (not (fx= gametic 0)))
         (hu-erase))
       ;; do buffered drawing
@@ -106,8 +106,24 @@
       ;; menus go directly to the screen
       (m-drawer)                        ; menu is drawn even on top of everything
       (net-update)                      ; send out any new accumulation
-      ;; normal update (and, until f_wipe exists, the wipe too)
-      (i-finish-update))))
+      (if (not wipe)
+          ;; normal update
+          (i-finish-update)             ; page flip or blit buffer
+          ;; wipe update
+          (begin
+            (wipe-end-screen 0 0 SCREENWIDTH SCREENHEIGHT)
+            (let loop ([wipestart (fx- (i-get-time) 1)])
+              (let wait ()
+                (let* ([nowtime (i-get-time)]
+                       [tics (fx- nowtime wipestart)])
+                  (if (fx= tics 0)
+                      (wait)
+                      (let ([done (wipe-screen-wipe wipe_Melt 0 0 SCREENWIDTH SCREENHEIGHT tics)])
+                        (i-update-no-blit)
+                        (m-drawer)      ; menu is drawn even on top of wipes
+                        (i-finish-update) ; page flip or blit buffer
+                        (unless done
+                          (loop nowtime))))))))))))
 
 ;; D_DoomLoop
 (define (d-doom-loop)
@@ -132,6 +148,7 @@
     (s-update-sounds (player-mo (vector-ref players consoleplayer))) ; move positional sounds
     ;; Update display, next frame, with current state.
     (d-display)
+    (when d-frame-hook (d-frame-hook))
     (loop)))
 
 ;; DEMO LOOP

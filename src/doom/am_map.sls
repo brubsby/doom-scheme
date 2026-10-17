@@ -1,11 +1,15 @@
 ;;; am_map: the automap.
 (library (doom am_map)
-  (export am-responder am-ticker am-drawer am-stop
+  (export am-responder am-ticker am-drawer am-stop st-responder-hook
           AM_MSGHEADER AM_MSGENTERED AM_MSGEXITED)
-  (import (chezscheme) (doom doomdef) (doom doomdata) (doom doomstat) (doom d_event)
+  (import (chezscheme) (doom global) (doom doomdef) (doom doomdata) (doom doomstat) (doom d_event)
           (doom d_player) (doom p_mobj.h) (doom p_local) (doom r_defs) (doom r_state)
           (doom m_fixed) (doom tables) (doom m_cheat) (doom v_video) (doom w_wad)
           (doom dstrings))
+
+  ;; ST_Responder, which is above the automap; d_main sets this when it
+  ;; loads.
+  (define-global st-responder-hook (lambda (ev) #f))
 
   ;; For use if I do walls with outsides/insides
   (define REDS (- 256 (* 5 16)))
@@ -296,8 +300,7 @@
     (set! old-m-w m-w)
     (set! old-m-h m-h)
     ;; inform the status bar of the change
-    ;; TODO(milestone 7): ST_Responder (ev_keyup, AM_MSGENTERED).
-    (void))
+    (st-responder-hook (make-event ev_keyup AM_MSGENTERED 0 0)))
 
   (define (am-load-pics)
     (do ([i 0 (fx+ i 1)]) ((fx= i 10))
@@ -322,9 +325,11 @@
 
   (define (am-stop)
     (set! automapactive #f)
-    ;; TODO(milestone 7): ST_Responder. Note C's initializer here is
-    ;; { 0, ev_keyup, AM_MSGEXITED }, so the event actually sent is
-    ;; type ev_keydown, data1 = ev_keyup (1), data2 = AM_MSGEXITED.
+    ;; C's initializer here is { 0, ev_keyup, AM_MSGEXITED }, so the event
+    ;; actually sent is type ev_keydown, data1 = ev_keyup (1), data2 =
+    ;; AM_MSGEXITED: the status bar sees a keypress of 1 (which resets the
+    ;; cheat matchers) and never learns the automap closed.
+    (st-responder-hook (make-event ev_keydown ev_keyup AM_MSGEXITED 0))
     (set! stopped #t))
 
   (define lastlevel -1)

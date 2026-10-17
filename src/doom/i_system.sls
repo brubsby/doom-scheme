@@ -1,7 +1,7 @@
 ;;; i_system: fatal errors, quitting, and timing.
 (library (doom i_system)
   (export i-error &doom-error doom-error? i-quit &doom-quit doom-quit?
-          i-get-time i-fake-time)
+          i-get-time i-fake-time i-wait-vbl)
   (import (chezscheme) (doom global))
 
   ;; I_Error: vanilla prints the message and exits. We raise a condition so
@@ -33,4 +33,10 @@
         (let* ([t (current-time 'time-monotonic)]
                [ms (+ (* (time-second t) 1000) (quotient (time-nanosecond t) 1000000))])
           (unless basetime (set! basetime ms))
-          (quotient (* (- ms basetime) 35) 1000)))))
+          (quotient (* (- ms basetime) 35) 1000))))
+
+  ;; I_WaitVBL: sleep count 70ths of a second (not under fake time).
+  (define (i-wait-vbl count)
+    (unless i-fake-time
+      (let ([ns (* count (quotient 1000000000 70))])
+        (sleep (make-time 'time-duration (remainder ns 1000000000) (quotient ns 1000000000)))))))

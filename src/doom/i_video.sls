@@ -4,8 +4,8 @@
 (library (doom i_video)
   (export i-init-graphics i-shutdown-graphics i-set-palette i-finish-update
           i-read-pixels i-poll-events i-xlate-key i-get-events i-start-tic i-start-frame
-          i-update-no-blit)
-  (import (chezscheme) (doom i_sdl) (doom doomdef) (doom v_video) (doom d_event) (doom i_system))
+          i-update-no-blit last-palette headless)
+  (import (chezscheme) (doom global) (doom i_sdl) (doom doomdef) (doom v_video) (doom d_event) (doom i_system))
 
   (define window 0)
   (define renderer 0)
@@ -18,7 +18,14 @@
     (when (eqv? x 0) (errorf who "~a" (sdl-get-error)))
     x)
 
+  ;; When true, I_InitGraphics opens no window (and so the frame is only
+  ;; drawn into screens, as in the oracle): tests and timing runs.
+  (define-global headless #f)
+
   (define (i-init-graphics)
+    (unless headless (init-graphics)))
+
+  (define (init-graphics)
     (when (< (sdl-init (logor SDL_INIT_VIDEO SDL_INIT_EVENTS)) 0)
       (errorf 'i-init-graphics "~a" (sdl-get-error)))
     (set! window (check 'sdl-create-window
@@ -41,10 +48,15 @@
   ;; I_SetPalette: 768 bytes of RGB triples (one PLAYPAL palette, starting at
   ;; `offset`), each component passed through gammatable[usegamma] as in
   ;; linuxdoom.
+  ;; The 768 bytes last passed to I_SetPalette (the trace hashes these, as
+  ;; the oracle's null video layer keeps them).
+  (define last-palette (make-bytevector 768 0))
+
   (define i-set-palette
     (case-lambda
       [(pal) (i-set-palette pal 0)]
       [(pal offset)
+       (bytevector-copy! pal offset last-palette 0 768)
        (let ([gamma (fx* usegamma 256)])
          (define (c j)
            (bytevector-u8-ref gammatable

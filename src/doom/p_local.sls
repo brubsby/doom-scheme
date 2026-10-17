@@ -28,11 +28,11 @@
    p-setup-level p-init map-lump-name
    ;; p_spec and friends
    p-spawn-specials p-update-specials p-cross-special-line p-use-special-line
-   p-damage-mobj p-touch-special-thing g-exit-level g-secret-exit-level
+   p-damage-mobj p-touch-special-thing p-give-power g-exit-level g-secret-exit-level
    ;; p_pspr
    p-setup-psprites p-move-psprites p-drop-weapon
    ;; stand-ins for unported functions
-   unported unported-calls unported-first-tic am-stop-hook
+   unported unported-calls unported-first-tic am-stop-hook st-start-hook hu-start-hook
    ;; p_local.h
    FLOATSPEED MAXHEALTH VIEWHEIGHT
           MAPBLOCKUNITS MAPBLOCKSIZE MAPBLOCKSHIFT MAPBMASK MAPBTOFRAC

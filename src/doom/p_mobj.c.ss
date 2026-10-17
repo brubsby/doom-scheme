@@ -390,9 +390,11 @@
           ;; give all cards in death match mode
           (unless (fx= deathmatch 0)
             (vector-fill! (player-cards p) #t))
-          ;; TODO(milestone 7): if this is the console player, ST_Start and
-          ;; HU_Start (wake up the status bar and the heads up text).
-          (void))))))
+          (when (fx= n consoleplayer)
+            ;; wake up the status bar
+            (st-start-hook)
+            ;; wake up the heads up text
+            (hu-start-hook)))))))
 
 ;; P_SpawnMapThing: the fields of the mapthing should already be in host
 ;; byte order.

@@ -21,11 +21,15 @@
    ;; r_sky
    SKYFLATNAME skyflatnum skytexture
    ;; r_things
-   r-init-sprites sprites numsprites garbage-mask)
+   r-init-sprites sprites numsprites garbage-mask spritedef-spriteframes spriteframe-lump
+   spriteframe-flip)
   (import (chezscheme) (doom global) (doom struct) (doom doomdef) (doom doomdata)
           (doom doomstat) (doom m_fixed) (doom m_bbox) (doom tables) (doom r_defs)
           (doom r_state) (doom r_data) (doom p_mobj.h) (doom d_player) (doom info)
           (doom v_video) (doom w_wad) (doom i_system))
+
+  ;; Garbage-read tracking, for tests (see r_things.c.ss and r_draw.c.ss).
+  (define-global garbage-mask #f)
 
   (include "r_main.c.ss")
   (include "r_draw.c.ss")

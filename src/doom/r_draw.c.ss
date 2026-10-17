@@ -39,6 +39,19 @@
                     (bytevector-u8-ref bv j)
                     0))]))
 
+;; src-ref for a column drawer writing screen offset(s) dest ...: a read
+;; past the source also marks those pixels in garbage-mask, when tracking.
+(define-syntax src-ref/mark
+  (syntax-rules ()
+    [(_ bv i dest ...)
+     (let ([j i])
+       (if (and (fx>= j 0) (fx< j (bytevector-length bv)))
+           (bytevector-u8-ref bv j)
+           (begin
+             (when garbage-mask
+               (bytevector-u8-set! garbage-mask dest 1) ...)
+             0)))]))
+
 (define (check-column who)
   (when (or (not (fx< -1 dc-x SCREENWIDTH)) (fx< dc-yl 0) (fx>= dc-yh SCREENHEIGHT))
     (i-error "~a: ~a to ~a at ~a" who dc-yl dc-yh dc-x)))
@@ -61,7 +74,8 @@
           ;; lighting/special effects LUT.
           (bytevector-u8-set!
            screens dest
-           (bytevector-u8-ref cmap (fx+ cofs (src-ref src (fx+ sofs (fxand (fxsra frac FRACBITS) 127))))))
+           (bytevector-u8-ref cmap (fx+ cofs (src-ref/mark src (fx+ sofs (fxand (fxsra frac FRACBITS) 127))
+                                                           dest))))
           (unless (fx= count 0)
             (loop (fx+ dest SCREENWIDTH) (fx+ frac fracstep) (fx- count 1))))))))
 
@@ -81,7 +95,8 @@
                    [count count])
           ;; Hack. Does not work corretly.
           (let ([c (bytevector-u8-ref
-                    cmap (fx+ cofs (src-ref src (fx+ sofs (fxand (fxsra frac FRACBITS) 127)))))])
+                    cmap (fx+ cofs (src-ref/mark src (fx+ sofs (fxand (fxsra frac FRACBITS) 127))
+                                                 dest dest2)))])
             (bytevector-u8-set! screens dest c)
             (bytevector-u8-set! screens dest2 c))
           (unless (fx= count 0)
@@ -115,11 +130,13 @@
       (let ([cmap colormaps])
         (let loop ([dest (fx+ (fxvector-ref ylookup dc-yl) (fxvector-ref columnofs dc-x))]
                    [count count])
-          (bytevector-u8-set!
-           screens dest
-           (bytevector-u8-ref cmap (fx+ (fx* 6 256)
-                                        (bytevector-u8-ref
-                                         screens (fx+ dest (fxvector-ref fuzzoffset fuzzpos))))))
+          (let ([src (fx+ dest (fxvector-ref fuzzoffset fuzzpos))])
+            (bytevector-u8-set!
+             screens dest
+             (bytevector-u8-ref cmap (fx+ (fx* 6 256) (bytevector-u8-ref screens src))))
+            ;; a pixel copied from a garbage pixel is garbage too
+            (when (and garbage-mask (fx= (bytevector-u8-ref garbage-mask src) 1))
+              (bytevector-u8-set! garbage-mask dest 1)))
           ;; Clamp table lookup index.
           (set! fuzzpos (fx+ fuzzpos 1))
           (when (fx= fuzzpos FUZZTABLE) (set! fuzzpos 0))
@@ -146,7 +163,8 @@
            screens dest
            (bytevector-u8-ref
             cmap (fx+ cofs (src-ref translationtables
-                                    (fx+ tofs (src-ref src (fx+ sofs (fxsra frac FRACBITS))))))))
+                                    (fx+ tofs (src-ref/mark src (fx+ sofs (fxsra frac FRACBITS))
+                                                            dest))))))
           (unless (fx= count 0)
             (loop (fx+ dest SCREENWIDTH) (int32 (fx+ frac fracstep)) (fx- count 1))))))))
 

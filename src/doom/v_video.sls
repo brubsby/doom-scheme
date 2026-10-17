@@ -10,7 +10,7 @@
   (export screens screen-base gammatable usegamma dirtybox
           v-init v-mark-rect v-copy-rect v-draw-patch v-draw-patch-flipped
           v-draw-patch-direct v-draw-block v-get-block
-          patch-width patch-height patch-leftoffset patch-topoffset)
+          patch-width patch-height patch-leftoffset patch-topoffset patch-columnofs)
   (import (chezscheme) (doom global) (doom doomdef) (doom i_system)
           (doom m_bbox) (doom v_video_data))
 

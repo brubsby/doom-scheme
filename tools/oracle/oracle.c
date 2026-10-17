@@ -14,8 +14,12 @@
 //   ORACLE_RAW_DIR=dir       dump screens[0] (raw palette indices, 64000
 //                            bytes) after every frame as dir/fNNNN.raw,
 //                            frames counted from 1
-//   ORACLE_KEYS=script       after frame F, post a keydown+keyup for each key:
+//   ORACLE_RAW_FRAMES=n,n,.. ... only after these frames
+//   ORACLE_KEYS=script       after frame F, post a keydown+keyup for each key
+//                            (+k: only the keydown, -k: only the keyup):
 //                            "F:k,k,...;F:k,..." with decimal doom key codes
+//   ORACLE_EXIT="F:n;F:s;.." after frame F, G_ExitLevel (n) or
+//                            G_SecretExitLevel (s)
 //   ORACLE_LEVELDUMP=path    P_SetupLevel writes the loaded level's structures
 //                            here (see oracle_level_dump)
 //   ORACLE_CAMERAS=path      at the end of P_SetupLevel, render the level from
@@ -52,6 +56,7 @@
 #include "w_wad.h"
 #include "doomdata.h"
 #include "r_main.h"
+#include "g_game.h"
 #include <string.h>
 
 extern byte oracle_palette[768];
@@ -63,6 +68,7 @@ static int   ppmevery = 35;
 static int   maxframes = -1, frames;
 static int   maxgametic = -1;
 static char* rawdir;
+static char* rawframes;
 static char* keyscript;
 
 typedef uint32_t u32;
@@ -89,7 +95,22 @@ static void dump_raw (void)
     fclose (f);
 }
 
-// Post the keys scripted for after this frame.
+// Whether n is in the comma-separated list s.
+static int in_list (char* s, int n)
+{
+    while (*s)
+    {
+        char* end;
+        if (strtol (s, &end, 10) == n && end != s) return 1;
+        if (*end != ',') break;
+        s = end + 1;
+    }
+    return 0;
+}
+
+// Post the keys scripted for after this frame. A key k posts a keydown
+// and a keyup; +k only the keydown and -k only the keyup (to hold a key
+// across tics).
 static void post_keys (void)
 {
     char* s = keyscript;
@@ -99,18 +120,40 @@ static void post_keys (void)
         if (*s++ != ':') { fprintf (stderr, "bad ORACLE_KEYS\n"); exit (2); }
         for (;;)
         {
-            int k = strtol (s, &s, 10);
+            int mode = 0, k;
+            if (*s == '+') { mode = 1; s++; }
+            else if (*s == '-') { mode = 2; s++; }
+            k = strtol (s, &s, 10);
             if (f == frames)
             {
                 event_t ev;
                 ev.data2 = ev.data3 = 0;
                 ev.data1 = k;
-                ev.type = ev_keydown; D_PostEvent (&ev);
-                ev.type = ev_keyup;   D_PostEvent (&ev);
+                if (mode != 2) { ev.type = ev_keydown; D_PostEvent (&ev); }
+                if (mode != 1) { ev.type = ev_keyup;   D_PostEvent (&ev); }
             }
             if (*s != ',') break;
             s++;
         }
+        if (*s == ';') s++;
+    }
+}
+
+// ORACLE_EXIT="F:n;F:s;...": after frame F, exit the level (G_ExitLevel
+// for n, G_SecretExitLevel for s), as if the player had used an exit.
+static void post_exit (void)
+{
+    char* s = getenv ("ORACLE_EXIT");
+    while (s && *s)
+    {
+        int f = strtol (s, &s, 10);
+        if (*s++ != ':') { fprintf (stderr, "bad ORACLE_EXIT\n"); exit (2); }
+        if (f == frames)
+        {
+            if (*s == 's') G_SecretExitLevel ();
+            else G_ExitLevel ();
+        }
+        while (*s && *s != ';') s++;
         if (*s == ';') s++;
     }
 }
@@ -278,6 +321,7 @@ void oracle_tic (void)
         if (getenv ("ORACLE_PPM_EVERY")) ppmevery = atoi (getenv ("ORACLE_PPM_EVERY"));
         if (getenv ("ORACLE_MAX_FRAMES")) maxframes = atoi (getenv ("ORACLE_MAX_FRAMES"));
         rawdir = getenv ("ORACLE_RAW_DIR");
+        rawframes = getenv ("ORACLE_RAW_FRAMES");
         if (getenv ("ORACLE_MAX_GAMETIC")) maxgametic = atoi (getenv ("ORACLE_MAX_GAMETIC"));
         keyscript = getenv ("ORACLE_KEYS");
     }
@@ -320,9 +364,10 @@ void oracle_tic (void)
     if (ppmdir && ppmevery > 0 && gametic % ppmevery == 0)
         dump_ppm ();
 
-    if (rawdir)
+    if (rawdir && (!rawframes || in_list (rawframes, frames)))
         dump_raw ();
     post_keys ();
+    post_exit ();
 
     if (maxframes >= 0 && frames >= maxframes)
         exit (0);
