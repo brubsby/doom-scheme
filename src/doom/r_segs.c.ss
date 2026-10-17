@@ -152,7 +152,12 @@
                        (set! dc-x rw-x)
                        (set! dc-iscale (fxquotient #xFFFFFFFF (fxand rw-scale #xFFFFFFFF)))
                        ;; calculate texture offset
-                       (fxsra (i- rw-offset (fixed-mul (fxvector-ref finetangent angle) rw-distance))
+                       ;; (past finetangent's end, C reads whatever follows
+                       ;; it: 0 here, and the column is marked)
+                       (fxsra (i- rw-offset (fixed-mul (if (fx< angle (fxquotient FINEANGLES 2))
+                                                           (fxvector-ref finetangent angle)
+                                                           (begin (mark-garbage-column! rw-x) 0))
+                                                       rw-distance))
                               FRACBITS))
                      0)])
             ;; draw the wall tiers
@@ -220,6 +225,15 @@
       (set! rw-x (fx+ rw-x 1))
       (loop))))
 
+;; Garbage-read tracking: column x of the view (both of its pixels in low
+;; detail), every row.
+(define (mark-garbage-column! col)
+  (when garbage-mask
+    (bytevector-u8-set! garbage-columns col 1)
+    (do ([x (fxsll col detailshift) (fx+ x 1)]) ((fx>= x (fxsll (fx+ col 1) detailshift)))
+      (do ([y 0 (fx+ y 1)]) ((fx= y viewheight))
+        (bytevector-u8-set! garbage-mask (fx+ (fx* (fx+ y viewwindowy) SCREENWIDTH) viewwindowx x) 1)))))
+
 ;; R_StoreWallRange: a wall segment will be drawn between start and stop
 ;; pixels (inclusive).
 (define (r-store-wall-range start stop)
@@ -247,6 +261,7 @@
         (drawseg-curline-set! ds curline)
         (set! rw-stopx (fx+ stop 1))
         ;; calculate scale at both ends and step
+        (set! scale-garbage #f)
         (set! rw-scale (r-scale-from-global-angle (angle+ viewangle (fxvector-ref xtoviewangle start))))
         (drawseg-scale1-set! ds rw-scale)
         (if (fx> stop start)
@@ -257,6 +272,10 @@
               (drawseg-scalestep-set! ds rw-scalestep))
             ;; (rw_scalestep and ds->scalestep keep their old values)
             (drawseg-scale2-set! ds (drawseg-scale1 ds)))
+        ;; a garbage sine: everything in these columns may differ
+        (when scale-garbage
+          (do ([x start (fx+ x 1)]) ((fx> x stop))
+            (mark-garbage-column! x)))
         ;; calculate texture boundaries and decide if floor / ceiling marks
         ;; are needed
         (set! worldtop (i- (sector-ceilingheight frontsector) viewz))

@@ -4,8 +4,8 @@
 (library (doom i_video)
   (export i-init-graphics i-shutdown-graphics i-set-palette i-finish-update
           i-read-pixels i-poll-events i-xlate-key i-get-events i-start-tic i-start-frame
-          i-update-no-blit last-palette headless)
-  (import (chezscheme) (doom global) (doom i_sdl) (doom doomdef) (doom v_video) (doom d_event) (doom i_system) (doom doomstat))
+          i-update-no-blit last-palette headless grabmouse)
+  (import (chezscheme) (doom global) (doom i_sdl) (doom doomdef) (doom v_video) (doom d_event) (doom i_system) (doom doomstat) (doom m_argv))
 
   (define window 0)
   (define renderer 0)
@@ -22,6 +22,8 @@
   ;; When true, I_InitGraphics opens no window (and so the frame is only
   ;; drawn into screens, as in the oracle): tests and timing runs.
   (define-global headless #f)
+  ;; -grabmouse (see I_GetEvent)
+  (define-global grabmouse #f)
 
   (define (i-init-graphics)
     (unless headless (init-graphics)))
@@ -38,6 +40,10 @@
     ;; 320x240 logical size stretches 200 lines to 4:3, like a VGA monitor.
     (sdl-render-set-logical-size renderer (* SCREENWIDTH hires-k) (* SCREENHEIGHT 6/5 hires-k))
     (set! argb (make-bytevector (* SCREENWIDTH SCREENHEIGHT 4 hires-k hires-k) 0))
+    ;; -grabmouse: keep the pointer (SDL's relative mode, which also hides
+    ;; it), as linuxdoom grabs and recenters it
+    (set! grabmouse (fx> (m-check-parm "-grabmouse") 0))
+    (when grabmouse (sdl-set-relative-mouse-mode 1))
     (set! texture (check 'sdl-create-texture
                          (sdl-create-texture renderer SDL_PIXELFORMAT_ARGB8888
                                              SDL_TEXTUREACCESS_STREAMING
@@ -157,16 +163,37 @@
 
   ;; I_GetEvent: translate pending SDL input into doom events, calling
   ;; (post event) for each (C: D_PostEvent). Returns #f on SDL_QUIT.
-  ;; TODO(milestone 4): mouse.
+  ;;
+  ;; The mouse as linuxdoom's X11 code: buttons 1-3 (left, middle, right)
+  ;; are bits 1, 2 and 4 of data1. A press posts the buttons held before it
+  ;; or'ed with the one pressed, a release those held before xor'ed with the
+  ;; one released, and motion the buttons held, with data2 = dx<<2 and
+  ;; data3 = -dy<<2 (unless both are 0).
+  (define mousebuttons 0)                ; held, as X's state mask
+  (define (button-bit b) (case b [(1) 1] [(2) 2] [(3) 4] [else 0]))
   (define (i-get-events post)
     (i-poll-events
      (lambda (ev)
        (let ([type (sdl-event-type ev)])
-         (when (or (fx= type SDL_KEYDOWN) (fx= type SDL_KEYUP))
-           (let ([key (i-xlate-key (sdl-event-key-sym ev))])
-             (when key
-               (post (make-event (if (fx= type SDL_KEYDOWN) ev_keydown ev_keyup)
-                                 key 0 0)))))))))
+         (cond
+           [(or (fx= type SDL_KEYDOWN) (fx= type SDL_KEYUP))
+            (let ([key (i-xlate-key (sdl-event-key-sym ev))])
+              (when key
+                (post (make-event (if (fx= type SDL_KEYDOWN) ev_keydown ev_keyup)
+                                  key 0 0))))]
+           [(fx= type SDL_MOUSEBUTTONDOWN)
+            (let ([b (button-bit (sdl-event-mouse-button ev))])
+              (post (make-event ev_mouse (fxior mousebuttons b) 0 0))
+              (set! mousebuttons (fxior mousebuttons b)))]
+           [(fx= type SDL_MOUSEBUTTONUP)
+            (let ([b (button-bit (sdl-event-mouse-button ev))])
+              (post (make-event ev_mouse (fxxor mousebuttons b) 0 0))
+              (set! mousebuttons (fxand mousebuttons (fxnot b))))]
+           [(fx= type SDL_MOUSEMOTION)
+            (let ([dx (fxsll (sdl-event-mouse-xrel ev) 2)]
+                  [dy (fxsll (fx- 0 (sdl-event-mouse-yrel ev)) 2)])
+              (unless (and (fx= dx 0) (fx= dy 0))
+                (post (make-event ev_mouse mousebuttons dx dy))))])))))
 
   ;; I_StartTic: process pending input, posting events with `post` (C calls
   ;; D_PostEvent, which is above this library). Closing the window quits.

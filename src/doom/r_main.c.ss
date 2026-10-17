@@ -177,13 +177,24 @@
 ;; R_ScaleFromGlobalAngle: returns the texture mapping scale for the
 ;; current line (horizontal span) at the given angle. rw_distance must be
 ;; calculated first.
+;; Set when a sine below came from before the table (see DESIGN.md,
+;; "Garbage reads"): an angle of exactly 180 degrees is INT_MIN as an int,
+;; and shifts to index -4096, so C reads whatever precedes finesine. The
+;; port reads 0, and R_StoreWallRange marks the wall's columns.
+(define scale-garbage #f)
+(define (sine-at angle)
+  (let ([i (fxsra angle ANGLETOFINESHIFT)])
+    (if (fx< i 0)
+        (begin (set! scale-garbage #t) 0)
+        (fxvector-ref finesine i))))
+
 (define (r-scale-from-global-angle visangle)
   ;; anglea/angleb are ints in C: shifted arithmetically.
   (let* ([anglea (int32 (fx+ ANG90 (fx- visangle viewangle)))]
          [angleb (int32 (fx+ ANG90 (fx- visangle rw-normalangle)))]
-         ;; both sines are allways positive
-         [sinea (fxvector-ref finesine (fxsra anglea ANGLETOFINESHIFT))]
-         [sineb (fxvector-ref finesine (fxsra angleb ANGLETOFINESHIFT))]
+         ;; both sines are allways positive (but for 180 degrees)
+         [sinea (sine-at anglea)]
+         [sineb (sine-at angleb)]
          [num (int32 (fxsll (fixed-mul projection sineb) detailshift))]
          [den (fixed-mul rw-distance sinea)])
     (if (fx> den (fxsra num 16))

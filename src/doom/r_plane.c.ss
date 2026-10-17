@@ -75,6 +75,15 @@
 (define (r-map-plane y x1 x2)
   (when (or (fx< x2 x1) (fx< x1 0) (fx>= x2 viewwidth) (not (fx<= 0 y viewheight)))
     (i-error "R_MapPlane: ~a, ~a at ~a" x1 x2 y))
+  ;; A span starting, ending or running through a garbage column (see
+  ;; mark-garbage-column!) may differ along its whole length: its texture
+  ;; steps are accumulated from where it starts.
+  (when (and garbage-mask
+             (let loop ([x (fxmax 0 (fx- x1 1))])
+               (and (fx<= x (fxmin (fx+ x2 1) (fx- viewwidth 1)))
+                    (or (fx= 1 (bytevector-u8-ref garbage-columns x)) (loop (fx+ x 1))))))
+    (do ([x (fxsll x1 detailshift) (fx+ x 1)]) ((fx>= x (fxsll (fx+ x2 1) detailshift)))
+      (bytevector-u8-set! garbage-mask (fx+ (fx* (fx+ y viewwindowy) SCREENWIDTH) viewwindowx x) 1)))
   (let ([distance
          (if (fx= planeheight (fxvector-ref cachedheight y))
              (begin
@@ -106,7 +115,11 @@
       (spanfunc))))
 
 ;; R_ClearPlanes: at begining of frame.
+;; Columns marked by mark-garbage-column! this frame.
+(define garbage-columns (make-bytevector MAXWIDTH 0))
+
 (define (r-clear-planes)
+  (when garbage-mask (bytevector-fill! garbage-columns 0))
   ;; opening / clipping determination
   (do ([i 0 (fx+ i 1)]) ((fx= i viewwidth))
     (fxvector-set! floorclip i viewheight)

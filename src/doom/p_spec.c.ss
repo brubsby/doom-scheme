@@ -473,19 +473,33 @@
         (let ([side (vector-ref sides (fxvector-ref (line-sidenum line) 0))])
           (side-textureoffset-set! side (i+ (side-textureoffset side) FRACUNIT))))))
   ;; DO BUTTONS
-  (vector-for-each
-   (lambda (b)
-     (unless (fx= (button-btimer b) 0)
-       (button-btimer-set! b (fx- (button-btimer b) 1))
-       (when (fx= (button-btimer b) 0)
-         (let ([side (vector-ref sides (fxvector-ref (line-sidenum (button-line b)) 0))])
-           (case (button-where b)
-             [(0) (side-toptexture-set! side (button-btexture b))]    ; top
-             [(1) (side-midtexture-set! side (button-btexture b))]    ; middle
-             [(2) (side-bottomtexture-set! side (button-btexture b))])) ; bottom
-         (s-start-sound (button-soundorg b) sfx_swtchn)
-         (struct-copy! b (make-button)))))
-   buttonlist))
+  (do ([i 0 (fx+ i 1)]) ((fx= i MAXBUTTONS))
+    (let ([b (vector-ref buttonlist i)])
+      (unless (fx= (button-btimer b) 0)
+        (button-btimer-set! b (fx- (button-btimer b) 1))
+        (when (fx= (button-btimer b) 0)
+          (let ([side (vector-ref sides (fxvector-ref (line-sidenum (button-line b)) 0))])
+            (case (button-where b)
+              [(0) (side-toptexture-set! side (button-btexture b))]    ; top
+              [(1) (side-midtexture-set! side (button-btexture b))]    ; middle
+              [(2) (side-bottomtexture-set! side (button-btexture b))])) ; bottom
+          ;; C: S_StartSound((mobj_t *)&buttonlist[i].soundorg, ...): the
+          ;; address of the soundorg field, taken as an mobj, whose x and y
+          ;; (12 and 16 bytes on) are the next button's btexture and btimer.
+          ;; (Past the last button C reads whatever follows; 0 here.)
+          (let ([org (vector-ref button-sound-origins i)]
+                [next (and (fx< (fx+ i 1) MAXBUTTONS) (vector-ref buttonlist (fx+ i 1)))])
+            (degenmobj-x-set! org (if next (button-btexture next) 0))
+            (degenmobj-y-set! org (if next (button-btimer next) 0))
+            (s-start-sound org sfx_swtchn))
+          (struct-copy! b (make-button)))))))
+
+;; The "mobjs" P_UpdateSpecials plays a button's sound from: one per button
+;; slot, as C's &buttonlist[i].soundorg is.
+(define button-sound-origins
+  (let ([v (make-vector MAXBUTTONS)])
+    (do ([i 0 (fx+ i 1)]) ((fx= i MAXBUTTONS) v)
+      (vector-set! v i (make-degenmobj)))))
 
 ;; Special Stuff that can not be categorized
 

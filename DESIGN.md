@@ -431,6 +431,15 @@ frame (`ORACLE_RAW_FRAMES`) and checks the pixels. The cases:
 - A `.doomrc` read and written back (see "The config file"), and
   `-devparm` screenshots.
 
+With `make freedoom`, Freedoom's IWADs stand in for DOOM II and The
+Ultimate DOOM (named `doom2.wad` and `doomu.wad`, so linuxdoom takes them
+for those): their demos, DOOM II's title loop, intermission, text screen
+and cast call, and episode 4's end. The oracle and the port only have to
+agree, so Freedoom's data being different from id's doesn't matter. These
+found three things the shareware cases never reached (see "Front end bugs,
+kept on purpose"): the button sound's origin, The Ultimate DOOM's sky, and
+the 180° angle reads.
+
 Each side runs in its own directory with its own `HOME`
 (`build/test/frames/NAME/{oracle,port}`). Every sound buffer the port's
 server mixes must hash the same as the oracle's server's. All the frames
@@ -589,6 +598,20 @@ the old end of the clip list and keeps it, and the port does the same.
   that message).
 - idclev in DOOM II sets the episode to 0 and then rejects episodes below
   1, so it never works.
+- `G_DoLoadLevel` picks DOOM II's sky by map number when `gamemode` is
+  `commercial`, `pack_tnt` or `pack_plut`. The last two are mission
+  values (2 and 3), equal to `commercial` and `retail`, so The Ultimate
+  DOOM's levels get SKY1 (maps 1–9), not their episode's sky.
+- `P_UpdateSpecials` plays a button's return sound from
+  `(mobj_t *)&buttonlist[i].soundorg`, the address of the pointer field.
+  The "mobj"'s x and y are then 12 and 16 bytes on: the next button's
+  texture number and timer, a spot near the map's origin, usually out of
+  earshot (and `S_StartSound` then draws no random pitch).
+- Angles of exactly 180° are `INT_MIN` as an `int`: `R_ScaleFromGlobalAngle`
+  then reads `finesine[-4096]`, and the seg loop `finetangent[4096]`,
+  memory outside the tables. The port reads 0 and marks those columns (and
+  floor and ceiling spans touching them) as garbage reads. Freedoom's DOOM
+  II demos hit it.
 - `M_Drawer` copies each line of a message into `char string[40]`. Quit
   message 8 (joined, as above) is 51 characters before its first `\n`:
   `strncpy` overflows the buffer and leaves it unterminated, so the line's

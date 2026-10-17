@@ -166,8 +166,11 @@
   ;; instead of simply setting one.
   (set! skyflatnum (r-flat-num-for-name SKYFLATNAME))
   ;; DOOM determines the sky texture to be used depending on the current
-  ;; episode, and the game version.
-  (when (fx= gamemode commercial)
+  ;; episode, and the game version. (C tests gamemode == commercial,
+  ;; pack_tnt or pack_plut, the last two GameMission_t values: 2 and 3, the
+  ;; values of commercial and retail. So The Ultimate DOOM gets DOOM II's
+  ;; skies by map number, over the episode's from G_InitNew.)
+  (when (or (fx= gamemode commercial) (fx= gamemode retail))
     (set! skytexture (r-texture-num-for-name
                       (cond [(fx< gamemap 12) "SKY1"] [(fx< gamemap 21) "SKY2"] [else "SKY3"]))))
   (set! levelstarttic gametic)          ; for time calculation

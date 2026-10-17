@@ -62,7 +62,8 @@
 ;; The cases: name, arguments, keys, exits, when to stop (max gametic, or
 ;; #f for the oracle's natural end), and optionally files to start with:
 ;; ((case file) ...), from that case's oracle directory, or (write path
-;; text), relative to both run directories.
+;; text), relative to both run directories; and (wad dir) runs both with
+;; DOOMWADDIR=wads/dir instead of wads (tools/fetch-freedoom.sh).
 (define cases
   `(;; -timedemo: the status bar, messages, palette flashes, the wipe into
     ;; the level.
@@ -133,6 +134,38 @@
      ((5 (+ ,UP)) (40 (- ,UP)) (41 (+ ,FIRE)) (60 (- ,FIRE)))
      () 300
      (("saveload" "doomsav0.dsg") ("saveload" "doomsav1.dsg")))
+;; Freedoom's IWADs as DOOM II and The Ultimate DOOM (tools/
+    ;; fetch-freedoom.sh; skipped when absent): their demos, which run
+    ;; DOOM II's monsters (the arch-vile, revenant tracers, mancubi...),
+    ;; maps and switches, and episode 4.
+    ("fd2-demo1" ("-timedemo" "demo1") () () #f ((wad "freedoom2")))
+    ("fd2-demo2" ("-timedemo" "demo2") () () #f ((wad "freedoom2")))
+    ("fd2-demo3" ("-timedemo" "demo3") () () #f ((wad "freedoom2")))
+    ("fd1-demo1" ("-timedemo" "demo1") () () #f ((wad "freedoom1")))
+    ("fd1-demo2" ("-timedemo" "demo2") () () #f ((wad "freedoom1")))
+    ;; (Its map needs more than linuxdoom's default 2 MB zone, mb_used.)
+    ("fd1-demo3" ("-timedemo" "demo3") () () #f
+     ((wad "freedoom1") (write "home/.doomrc" "mb_used\t\t16\n")))
+;; DOOM II's front end: its title loop (TITLEPIC, CREDIT, the demos);
+    ;; its intermission, and the text screen after MAP06; the end, after
+    ;; MAP30: the text, then the cast call, keys advancing it to deaths.
+    ("fd2-attract" () () () 12000 ((wad "freedoom2")))
+    ("fd2-text" ("-warp" "6" "-skill" "3")
+     ;; (the intermission and the text screen go on when a ticcmd has
+     ;; buttons: keys held over a tic)
+     ((40 (+ ,FIRE)) (41 (- ,FIRE)) (50 (+ ,FIRE)) (51 (- ,FIRE)) (60 (+ ,USE)) (61 (- ,USE))
+      (150 (+ ,USE)) (152 (- ,USE)))
+     ((10 . n)) 2500 ((wad "freedoom2")))
+    ("fd2-cast" ("-warp" "30" "-skill" "3")
+     ((40 (+ ,FIRE)) (41 (- ,FIRE)) (50 (+ ,FIRE)) (51 (- ,FIRE)) (60 (+ ,USE)) (61 (- ,USE))
+      (150 (+ ,USE)) (152 (- ,USE))
+      (300 ,USE) (380 ,USE) (420 ,USE) (500 ,USE) (560 ,USE) (640 ,USE) (700 ,USE))
+     ((10 . n)) 8000 ((wad "freedoom2")))
+    ;; The Ultimate DOOM's episode 4: its end (E4M8's exit, the text and
+    ;; the picture).
+    ("fd1-e4" ("-warp" "4" "8" "-skill" "3")
+     ((420 ,ESC) (424 ,ESC))
+     ((10 . n)) 2500 ((wad "freedoom1")))
     ;; -devparm: the tic-rate dots, and screenshots (F1), which must be the
     ;; oracle's PCX files byte for byte.
     ("screenshot" ("-warp" "1" "1" "-devparm")
@@ -169,12 +202,19 @@
   (let ([d (format "~a/~a/~a" dir name side)])
     (system (format "rm -rf ~a && mkdir -p ~a/home" d d))
     (for-each (lambda (f)
-                (if (eq? (car f) 'write)
+                (cond
+                  [(eq? (car f) 'wad) (void)]
+                  [(eq? (car f) 'write)
                     (call-with-output-file (format "~a/~a" d (cadr f))
-                      (lambda (p) (display (caddr f) p)))
-                    (system (format "cp ~a/~a/oracle/~a ~a/" dir (car f) (cadr f) d))))
+                      (lambda (p) (display (caddr f) p)))]
+                  [else (system (format "cp ~a/~a/oracle/~a ~a/" dir (car f) (cadr f) d))]))
               files)
     d))
+
+;; The case's WAD directory.
+(define (wad-dir files)
+  (let ([w (assq 'wad files)])
+    (format "~a/wads~a" (current-directory) (if w (string-append "/" (cadr w)) ""))))
 
 ;; Run the oracle on a case, writing dir/NAME.trace. With raw-frames (a
 ;; list, or 'all), also dump those frames as dir/NAME-oracle/fNNNN.raw.
@@ -185,8 +225,8 @@
            [rawdir (format "~a/~a-oracle" dir name)])
        (system (format "rm -rf ~a && mkdir -p ~a" rawdir rawdir))
        (system
-        (format "cd ~a && env -i HOME=$PWD/home DOOMWADDIR=~a/wads ORACLE_TRACE=~a/~a/~a.trace ORACLE_SNDSERVER=~a/build/oracle/sndserver ORACLE_AUDIO=~a/~a/~a.audio ORACLE_FAKETIME=1 ~a ~a ~a ~a setarch -R ~a/build/oracle/doom-oracle ~a > ~a.log 2>&1"
-                rundir (current-directory) (current-directory) dir name
+        (format "cd ~a && env -i HOME=$PWD/home DOOMWADDIR=~a ORACLE_TRACE=~a/~a/~a.trace ORACLE_SNDSERVER=~a/build/oracle/sndserver ORACLE_AUDIO=~a/~a/~a.audio ORACLE_FAKETIME=1 ~a ~a ~a ~a setarch -R ~a/build/oracle/doom-oracle ~a > ~a.log 2>&1"
+                rundir (wad-dir files) (current-directory) dir name
                 (current-directory) (current-directory) dir name
                 (if maxgametic (format "ORACLE_MAX_GAMETIC=~a" maxgametic) "")
                 (if (null? keys) "" (format "ORACLE_KEYS='~a'" (script->string keys)))
@@ -235,7 +275,7 @@
      (let ([mask (make-bytevector (* SCREENWIDTH SCREENHEIGHT) 0)]
            [n 0] [mismatch #f] [candidates '()] [audio '()] [saves '()]
            [rundir (setup-run-dir name "port" files)]
-           [wads (format "~a/wads" (current-directory))]
+           [wads (wad-dir files)]
            [portdir (format "~a/~a/~a-port" (current-directory) dir name)])
        (system (format "rm -rf ~a && mkdir -p ~a" portdir portdir))
        (set! headless #t)
@@ -331,6 +371,11 @@
                   k)))))
 
 (define (run-case name)
+  (if (file-exists? (wad-dir (list-ref (case-ref name) 5)))
+      (run-case* name)
+      (printf "skip ~a: no ~a (make freedoom)\n" name (wad-dir (list-ref (case-ref name) 5)))))
+
+(define (run-case* name)
   (run-oracle name #f)
   (let ([theirs (read-trace (format "~a/~a.trace" dir name))])
     (let-values ([(n mismatch candidates audio saves) (run-port name theirs)])

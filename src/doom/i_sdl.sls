@@ -16,7 +16,7 @@
           sdl-event-mouse-xrel sdl-event-mouse-yrel sdl-event-mouse-button
           AUDIO_S16LSB sdl-init-sub-system sdl-open-audio-device sdl-close-audio-device
           sdl-pause-audio-device sdl-queue-audio sdl-get-queued-audio-size
-          sdl-clear-queued-audio)
+          sdl-clear-queued-audio sdl-set-relative-mouse-mode sdl-push-event)
   (import (chezscheme))
 
   (define lib (load-shared-object "libSDL2-2.0.so.0"))
@@ -92,6 +92,9 @@
   (define sdl-get-queued-audio-size
     (foreign-procedure "SDL_GetQueuedAudioSize" (unsigned-32) unsigned-32))
   (define sdl-clear-queued-audio (foreign-procedure "SDL_ClearQueuedAudio" (unsigned-32) void))
+
+  (define sdl-set-relative-mouse-mode (foreign-procedure "SDL_SetRelativeMouseMode" (int) int))
+  (define sdl-push-event (foreign-procedure "SDL_PushEvent" (u8*) int))
 
   ;; SDL_Event is a 56-byte union; we read the few fields we need by offset.
   (define (make-sdl-event) (make-bytevector 56 0))

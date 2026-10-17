@@ -12,6 +12,11 @@ wad: wads/doom1.wad
 wads/doom1.wad:
 	tools/fetch-wad.sh
 
+# Freedoom's IWADs as DOOM II and The Ultimate DOOM, for the frame tests'
+# fd* cases (skipped without them).
+freedoom:
+	tools/fetch-freedoom.sh
+
 oracle: build/oracle/doom-oracle
 build/oracle/doom-oracle: FORCE
 	@$(MAKE) -s --no-print-directory -C tools/oracle
@@ -72,4 +77,4 @@ run:
 clean:
 	rm -rf build src/doom/*.so src/doom/*.wpo
 
-.PHONY: all wad oracle oracle-traces info test run clean FORCE
+.PHONY: all wad freedoom oracle oracle-traces info test run clean FORCE
