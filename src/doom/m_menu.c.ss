@@ -1,8 +1,5 @@
 ;;; m_menu.c: DOOM selection menu, options, episode etc. Sliders and
 ;;; icons. Kinda widget stuff. Included by d_main.sls.
-;;;
-;;; Saving and loading go through g_game's G_SaveGame / G_LoadGame, which
-;;; wait for p_saveg (milestone 9).
 
 ;; (mouseSensitivity, showMessages, detailLevel and screenblocks: m_misc's
 ;; defaults)
@@ -844,6 +841,17 @@
                            (if (fx= i rest)
                                (values (substring msg start len) (fx+ start i))
                                (values string start))])
+               ;; C copies the line into char string[40]. A line of 40 or
+               ;; more characters overflows it (strncpy leaves it
+               ;; unterminated, so its width, and so where it's centered,
+               ;; comes from whatever bytes follow on the stack): the port
+               ;; prints the line, and marks its band as a garbage read.
+               (when (and garbage-mask (fx>= (string-length string) 40))
+                 (let ([h (patch-height (vector-ref hu_font 0))])
+                   (do ([row (fxmax 0 (fx- y 2)) (fx+ row 1)])
+                       ((fx>= row (fxmin SCREENHEIGHT (fx+ y h 2))))
+                     (do ([x 0 (fx+ x 1)]) ((fx= x SCREENWIDTH))
+                       (bytevector-u8-set! garbage-mask (fx+ (fx* row SCREENWIDTH) x) 1)))))
                (m-write-text (fx- 160 (fxquotient (m-string-width string) 2)) y string)
                (loop start (fx+ y (patch-height (vector-ref hu_font 0)))))))))]
     [(not menuactive) (void)]

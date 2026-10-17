@@ -1,20 +1,16 @@
 ;;; s_sound: the sound system's interface to the game: channels, priority,
 ;;; distance and stereo, and music selection.
 ;;;
-;;; The game logic is ported in full, because it touches the simulation's
-;;; neighbours: S_StartSound calls M_Random (pitch variation) only for
-;;; sounds that are audible and get a channel, and the status bar face and
-;;; the screen wipe read the same M_Random stream. Nothing is played yet
-;;; (milestone 8): the i_sound calls are the oracle's null layer's, where
-;;; I_SoundIsPlaying is always false, so S_UpdateSounds frees every channel
-;;; each frame, exactly as in the oracle.
+;;; S_StartSound calls M_Random (pitch variation) for audible sounds, and
+;;; the status bar face and the screen wipe read the same M_Random stream.
+;;; The sounds themselves go to i_sound (linuxdoom's sound server).
 (library (doom s_sound)
   (export s-init s-start s-start-sound s-start-sound-at-volume s-stop-sound s-start-music
           s-change-music s-stop-music s-pause-sound s-resume-sound s-update-sounds
           s-set-music-volume s-set-sfx-volume snd_SfxVolume snd_MusicVolume numChannels)
   (import (chezscheme) (doom global) (doom doomdef) (doom doomstat) (doom d_player)
           (doom sounds) (doom m_fixed) (doom m_random) (doom tables) (doom w_wad)
-          (doom i_system) (doom r_defs) (doom p_mobj.h) (doom r_local))
+          (doom i_system) (doom i_sound) (doom r_defs) (doom p_mobj.h) (doom r_local))
 
   (define S_CLIPPING_DIST (* 1200 #x10000)) ; when to clip out sounds
   ;; Distance to origin when sounds should be maxed out.
@@ -43,20 +39,16 @@
 
   (define mus_paused #f)                ; whether songs are mus_paused
   (define mus_playing #f)               ; music currently being played (an index)
-  ;; music lump numbers, looked up on first use
+  ;; music lump numbers, looked up on first use, and the playing song's
+  ;; handle
   (define music-lumpnum (make-vector NUMMUSIC #f))
-
-  ;; The i_sound layer, as the oracle's null one (milestone 8 plays sound).
-  (define next-handle 0)
-  (define (i-start-sound id vol sep pitch priority)
-    (let ([h next-handle]) (set! next-handle (fx+ h 1)) h))
-  (define (i-sound-is-playing handle) #f)
-  (define (i-get-sfx-lump-num sfx)
-    (w-get-num-for-name (string-append "ds" (sfxinfo-name sfx))))
+  (define mus-handle 0)
 
   ;; S_Init: initializes sound stuff, including volume. Sets channels, SFX
   ;; and music volume, allocates channel buffer, sets S_sfx lookup.
   (define (s-init sfx-volume music-volume)
+    ;; Whatever these did with DMX, these are rather dummies now.
+    (i-set-channels)
     (s-set-sfx-volume sfx-volume)
     (s-set-music-volume music-volume)
     ;; Allocating the internal channels for mixing; free all channels for
@@ -160,10 +152,12 @@
   ;; Stop and resume music, during game PAUSE.
   (define (s-pause-sound)
     (when (and mus_playing (not mus_paused))
+      (i-pause-song mus-handle)
       (set! mus_paused #t)))
 
   (define (s-resume-sound)
     (when (and mus_playing mus_paused)
+      (i-resume-song mus-handle)
       (set! mus_paused #f)))
 
   ;; S_UpdateSounds: updates music & sounds.
@@ -184,14 +178,17 @@
                       (when (and (channel-origin c) (not (eq? listener (channel-origin c))))
                         (let-values ([(audible v s p)
                                       (s-adjust-sound-params listener (channel-origin c) volume NORM_SEP pitch)])
-                          (unless audible
-                            (s-stop-channel cnum)))))))
+                          (if audible
+                              (i-update-sound-params (channel-handle c) v s p)
+                              (s-stop-channel cnum)))))))
               ;; if channel is allocated but sound has stopped, free it
               (s-stop-channel cnum))))))
 
   (define (s-set-music-volume volume)
     (when (or (fx< volume 0) (fx> volume 127))
       (i-error "Attempt to set music volume at ~a" volume))
+    (i-set-music-volume 127)
+    (i-set-music-volume volume)
     (set! snd_MusicVolume volume))
 
   (define (s-set-sfx-volume volume)
@@ -213,19 +210,28 @@
       (unless (vector-ref music-lumpnum musicnum)
         (vector-set! music-lumpnum musicnum
                      (w-get-num-for-name (string-append "d_" (vector-ref S_music musicnum)))))
-      ;; (load, register and play it: milestone 8)
+      ;; load & register it
+      (set! mus-handle (i-register-song (w-cache-lump-num (vector-ref music-lumpnum musicnum))))
+      ;; play it
+      (i-play-song mus-handle looping)
       (set! mus_playing musicnum)))
 
   (define (s-stop-music)
     (when mus_playing
-      (set! mus_paused #f)
+      (when mus_paused
+        (i-resume-song mus-handle))
+      (i-stop-song mus-handle)
+      (i-unregister-song mus-handle)
+      ;; (mus_paused stays as it was, as in C)
       (set! mus_playing #f)))
 
   (define (s-stop-channel cnum)
     (let* ([c (vector-ref channels cnum)]
            [sfx (channel-sfxinfo c)])
       (when sfx
-        ;; (stop the sound playing: nothing is playing yet)
+        ;; stop the sound playing
+        (when (i-sound-is-playing (channel-handle c))
+          (i-stop-sound (channel-handle c)))
         ;; degrade usefulness of sound data
         (sfxinfo-usefulness-set! sfx (fx- (sfxinfo-usefulness sfx) 1))
         (channel-sfxinfo-set! c #f))))

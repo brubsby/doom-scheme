@@ -367,6 +367,10 @@
 
 ;; R_RenderPlayerView. (C calls NetUpdate between the phases to poll for
 ;; network input; that has no effect on the picture.)
+;; NetUpdate, which d_main (above the renderer) sets: the renderer checks
+;; for new console commands between its phases.
+(define-global r-net-update (lambda () (void)))
+
 (define (r-render-player-view player)
   (r-setup-frame player)
   ;; Clear buffers.
@@ -374,7 +378,15 @@
   (r-clear-draw-segs)
   (r-clear-planes)
   (r-clear-sprites)
+  ;; check for new console commands.
+  (r-net-update)
   ;; The head node is the last node output.
   (r-render-bsp-node (fx- numnodes 1))
+  ;; Check for new console commands.
+  (r-net-update)
   (r-draw-planes)
-  (r-draw-masked))
+  ;; Check for new console commands.
+  (r-net-update)
+  (r-draw-masked)
+  ;; Check for new console commands.
+  (r-net-update))

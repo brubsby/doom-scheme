@@ -5,7 +5,7 @@
   (export i-init-graphics i-shutdown-graphics i-set-palette i-finish-update
           i-read-pixels i-poll-events i-xlate-key i-get-events i-start-tic i-start-frame
           i-update-no-blit last-palette headless)
-  (import (chezscheme) (doom global) (doom i_sdl) (doom doomdef) (doom v_video) (doom d_event) (doom i_system))
+  (import (chezscheme) (doom global) (doom i_sdl) (doom doomdef) (doom v_video) (doom d_event) (doom i_system) (doom doomstat))
 
   (define window 0)
   (define renderer 0)
@@ -70,7 +70,16 @@
                                    (c (fx+ j 2)))))))]))
 
   ;; I_FinishUpdate: show screens[0].
+  (define lasttic 0)
   (define (i-finish-update)
+   ;; draws little dots on the bottom of the screen
+   (when devparm
+     (let* ([i (i-get-time)]
+            [tics (fxmin 20 (fx- i lasttic))]
+            [row (fx* (fx- SCREENHEIGHT 1) SCREENWIDTH)])
+       (set! lasttic i)
+       (do ([i 0 (fx+ i 2)]) ((fx>= i 40))
+         (bytevector-u8-set! screens (fx+ row i) (if (fx< i (fx* tics 2)) #xff 0)))))
    (unless (eqv? window 0)
     (let ([n (fx* SCREENWIDTH SCREENHEIGHT)])
       (do ([i 0 (fx+ i 1)]) ((fx= i n))

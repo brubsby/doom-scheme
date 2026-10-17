@@ -2,7 +2,6 @@
 ;;; completion, demo recording and playback, and the per-tic game driver.
 ;;; Included by d_main.sls.
 ;;;
-;;; Saving and loading (p_saveg, milestone 9) are logged as unported.
 
 (define SAVEGAMESIZE #x2c000)
 (define SAVESTRINGSIZE 24)
@@ -311,8 +310,8 @@
              (set! paused (not paused))
              (if paused (s-pause-sound) (s-resume-sound))]
             [(fx= (fxand buttons BT_SPECIALMASK) BTS_SAVEGAME)
-             (when (string=? savedescription "")
-               (set! savedescription "NET GAME"))
+             (when (fx= (bytevector-u8-ref savedescription 0) 0)
+               (strcpy! savedescription "NET GAME"))
              (set! savegameslot (fxsra (fxand buttons BTS_SAVEMASK) BTS_SAVESHIFT))
              (set! gameaction ga_savegame)])))))
   ;; do main actions
@@ -512,28 +511,114 @@
   (set! gameaction ga_nothing)
   (set! viewactive #t))
 
-;; G_InitFromSavegame / G_LoadGame / G_SaveGame.
-;; TODO(milestone 9): p_saveg.
+;; G_InitFromSavegame: can be called by the startup code or the menu
+;; task.
 (define savename "")
 (define (g-load-game name)
   (set! savename name)
   (set! gameaction ga_loadgame))
 
+(define VERSIONSIZE 16)
+
+;; strcpy into a C char buffer.
+(define (strcpy! bv str)
+  (do ([i 0 (fx+ i 1)]) ((fx= i (string-length str)))
+    (bytevector-u8-set! bv i (char->integer (string-ref str i))))
+  (bytevector-u8-set! bv (string-length str) 0))
+
+;; The version field: "version 110", NUL-padded to VERSIONSIZE bytes.
+(define (version-string)
+  (let ([bv (make-bytevector VERSIONSIZE 0)])
+    (strcpy! bv (format "version ~a" VERSION))
+    bv))
+
 (define (g-do-load-game)
   (set! gameaction ga_nothing)
-  (unported 'G_DoLoadGame))
+  (set! savebuffer (m-read-file savename))
+  (set! save_p SAVESTRINGSIZE)
+  ;; skip the description field
+  (let ([vcheck (version-string)])
+    ;; strcmp: the bytes up to vcheck's terminator, and save_p's too
+    (when (let loop ([i 0])
+            (let ([a (bytevector-u8-ref savebuffer (fx+ save_p i))]
+                  [b (bytevector-u8-ref vcheck i)])
+              (and (fx= a b) (or (fx= a 0) (loop (fx+ i 1))))))
+      (set! save_p (fx+ save_p VERSIONSIZE))
+      (set! gameskill (load-byte!))
+      (set! gameepisode (load-byte!))
+      (set! gamemap (load-byte!))
+      (do ([i 0 (fx+ i 1)]) ((fx= i MAXPLAYERS))
+        (vector-set! playeringame i (not (fx= (load-byte!) 0))))
+      ;; load a base level
+      (g-init-new gameskill gameepisode gamemap)
+      ;; get the times
+      (let* ([a (load-byte!)] [b (load-byte!)] [c (load-byte!)])
+        (set! leveltime (fx+ (fxsll a 16) (fxsll b 8) c)))
+      ;; dearchive all the modifications
+      (p-unarchive-players)
+      (p-unarchive-world)
+      (p-unarchive-thinkers)
+      (p-unarchive-specials)
+      (unless (fx= (bytevector-u8-ref savebuffer save_p) #x1d)
+        (i-error "Bad savegame"))
+      ;; done
+      (set! savebuffer (make-bytevector 0))
+      (when setsizeneeded
+        (r-execute-set-view-size))
+      ;; draw the pattern into the back screen
+      (r-fill-back-screen))))
+
+;; Called with each savegame written: (name bytes mask), the mask as in
+;; p_saveg (tests compare the bytes with the oracle's).
+(define-global saveg-hook #f)
 
 ;; G_SaveGame: called by the menu task. Description is a 24 byte text
 ;; string.
 (define (g-save-game slot description)
   (set! savegameslot slot)
-  (set! savedescription description)
+  (strcpy! savedescription description)
   (set! sendsave #t))
 
 (define (g-do-save-game)
-  (set! gameaction ga_nothing)
-  (set! savedescription "")
-  (unported 'G_DoSaveGame))
+  (let ([name (if (fx> (m-check-parm "-cdrom") 0)
+                  (format "c:\\doomdata\\doomsav~a.dsg" savegameslot)
+                  (format "doomsav~a.dsg" savegameslot))])
+    ;; C writes into screens[1]+0x4000 and checks for an overrun after;
+    ;; the buffer here has room to spare.
+    (set! savebuffer (make-bytevector (fx* 2 SAVEGAMESIZE) 0))
+    (set! savemask (and saveg-hook (make-bytevector (fx* 2 SAVEGAMESIZE) 0)))
+    (set! save_p 0)
+    (bytevector-copy! savedescription 0 savebuffer save_p SAVESTRINGSIZE)
+    (set! save_p (fx+ save_p SAVESTRINGSIZE))
+    (bytevector-copy! (version-string) 0 savebuffer save_p VERSIONSIZE)
+    (set! save_p (fx+ save_p VERSIONSIZE))
+    (save-byte! gameskill)
+    (save-byte! gameepisode)
+    (save-byte! gamemap)
+    (do ([i 0 (fx+ i 1)]) ((fx= i MAXPLAYERS))
+      (save-byte! (if (vector-ref playeringame i) 1 0)))
+    (save-byte! (fxsra leveltime 16))
+    (save-byte! (fxsra leveltime 8))
+    (save-byte! leveltime)
+    (p-archive-players)
+    (p-archive-world)
+    (p-archive-thinkers)
+    (p-archive-specials)
+    (save-byte! #x1d)                   ; consistancy marker
+    (let ([length save_p])
+      (when (fx> length SAVEGAMESIZE)
+        (i-error "Savegame buffer overrun"))
+      (m-write-file name savebuffer length)
+      (when saveg-hook
+        (saveg-hook name (bytevector-truncate! savebuffer length)
+                    (bytevector-truncate! savemask length))))
+    (set! savebuffer (make-bytevector 0))
+    (set! savemask #f)
+    (set! gameaction ga_nothing)
+    (bytevector-u8-set! savedescription 0 0)
+    (player-message-set! (vector-ref players consoleplayer) GGSAVED)
+    ;; draw the pattern into the back screen
+    (r-fill-back-screen)))
 
 ;; G_InitNew: can be called by the startup code or the menu task;
 ;; consoleplayer, displayplayer, playeringame[] should be set.

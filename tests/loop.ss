@@ -10,7 +10,7 @@
 ;;;
 ;;; Fields are the simulation's (as tests/sim.ss); with no input and no
 ;;; front end, rndindex and the frame are not compared.
-(import (chezscheme) (doom d_main) (doom doomstat) (doom i_system) (doom trace))
+(import (chezscheme) (doom d_main) (doom doomstat) (doom i_system) (doom i_video) (doom trace))
 (load "tests/lib.ss")
 
 (define compared-fields
@@ -65,6 +65,7 @@
                                          compared-fields o t))))]))])))
 
 (set! nodrawers #t)
+(set! headless #t)                      ; no audio device either
 (set! i-fake-time #t)
 
 ;; Each case runs in its own process, as each oracle run does (a game

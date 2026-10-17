@@ -11,9 +11,11 @@ git clone --recursive https://github.com/brubsby/doom-scheme.git
 cd doom-scheme
 nix develop
 make wad            # fetch + verify the v1.9 shareware doom1.wad into wads/
-make run            # DOOM: title loop, menus (ESC), the shareware episode
-make run ARGS="-warp 1 3 -skill 4"   # any of linuxdoom's command line
+make run            # DOOM: title loop, menus (ESC), the shareware episode, sound,
+                    # savegames, ~/.doomrc
+make run ARGS="-warp 1 3 -skill 4"   # any of linuxdoom's command line (and -nosound)
 make test           # Scheme vs. oracle: the renderer, the playsim, and every
-                    # frame of demos, menus, intermission and finale
+                    # frame and sound buffer of demos, menus, intermission,
+                    # finale, saving and loading
 make oracle-traces  # build headless linuxdoom, trace DEMO1-3 into build/oracle/
 ```

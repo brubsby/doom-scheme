@@ -1,0 +1,135 @@
+--- sndserv/linux.c
++++ sndserv/linux.c
+@@ -40,11 +40,15 @@
+ #include <fcntl.h>
+ #include <unistd.h>
+ 
+-#include <linux/soundcard.h>
++// oracle: no OSS device.
++#include <stdint.h>
++#include <errno.h>
+ 
+ #include "soundsrv.h"
+ 
+ int	audio_fd;
++static FILE* oracle_audiofile;
++static FILE* oracle_rawfile;
+ 
+ void
+ myioctl
+@@ -53,7 +57,7 @@
+   int*	arg )
+ {   
+     int		rc;
+-    extern int	errno;
++    // oracle: glibc's errno is thread-local, so no extern int.
+     
+     rc = ioctl(fd, command, arg);  
+     if (rc < 0)
+@@ -76,25 +80,14 @@
+ 
+     int i;
+                 
+-    audio_fd = open("/dev/dsp", O_WRONLY);
+-    if (audio_fd<0)
+-        fprintf(stderr, "Could not open /dev/dsp\n");
+-         
+-                     
+-    i = 11 | (2<<16);                                           
+-    myioctl(audio_fd, SNDCTL_DSP_SETFRAGMENT, &i);
+-                    
+-    myioctl(audio_fd, SNDCTL_DSP_RESET, 0);
+-    i=11025;
+-    myioctl(audio_fd, SNDCTL_DSP_SPEED, &i);
+-    i=1;    
+-    myioctl(audio_fd, SNDCTL_DSP_STEREO, &i);
+-            
+-    myioctl(audio_fd, SNDCTL_DSP_GETFMTS, &i);
+-    if (i&=AFMT_S16_LE)    
+-        myioctl(audio_fd, SNDCTL_DSP_SETFMT, &i);
+-    else
+-        fprintf(stderr, "Could not play signed 16 data\n");
++    // oracle: no device. ORACLE_AUDIO gets one line per mixed buffer,
++    // "n hash" (n counted from 1; hash: FNV-1a over the buffer as
++    // little-endian uint32 words, as in oracle.c), and ORACLE_AUDIO_RAW the
++    // samples themselves.
++    if (getenv("ORACLE_AUDIO"))
++        oracle_audiofile = fopen(getenv("ORACLE_AUDIO"), "w");
++    if (getenv("ORACLE_AUDIO_RAW"))
++        oracle_rawfile = fopen(getenv("ORACLE_AUDIO_RAW"), "wb");
+ 
+ }
+ 
+@@ -103,13 +96,33 @@
+ ( void*	samples,
+   int	samplecount )
+ {
+-    write(audio_fd, samples, samplecount*4);
++    // oracle: hash (and dump) the buffer instead of writing /dev/dsp.
++    static int n;
++    unsigned char* p = samples;
++    uint32_t h = 2166136261u;
++    int i;
++    for (i = 0; i < samplecount*4; i += 4)
++    {
++        h ^= p[i] | (p[i+1] << 8) | (p[i+2] << 16) | ((uint32_t) p[i+3] << 24);
++        h *= 16777619u;
++    }
++    n++;
++    if (oracle_audiofile)
++    {
++        fprintf(oracle_audiofile, "%d %u\n", n, h);
++        fflush(oracle_audiofile);
++    }
++    if (oracle_rawfile)
++    {
++        fwrite(samples, 1, samplecount*4, oracle_rawfile);
++        fflush(oracle_rawfile);
++    }
+ }
+ 
+ void I_ShutdownSound(void)
+ {
+ 
+-    close(audio_fd);
++    // oracle: no device to close.
+ 
+ }
+ 
+--- sndserv/soundsrv.c
++++ sndserv/soundsrv.c
+@@ -632,7 +632,9 @@
+ 	{
+ 	    do {
+ 		scratchset = fdset;
+-		rc = select(FD_SETSIZE, &scratchset, 0, 0, &zerowait);
++		// oracle: lockstep with the game. Block for commands until
++		// the game's "f" (frame done), then mix one buffer.
++		rc = 1;
+ 
+ 		if (rc > 0)
+ 		{
+@@ -642,8 +644,8 @@
+ 
+ 		    if (!nrc)
+ 		    {
+-			done = 1;
+-			rc = 0;
++			// oracle: the game exited; don't mix another buffer.
++			quit();
+ 		    }
+ 		    else
+ 		    {
+@@ -691,6 +693,12 @@
+ 			    //	outputushort(handle);
+ 			    break;
+ 			    
++			  case 'f':
++			    // oracle: frame done.
++			    read(0, commandbuf, 1);
++			    rc = 0;
++			    break;
++			    
+ 			  case 'q':
+ 			    read(0, commandbuf, 1);
+ 			    waitingtofinish = 1; rc = 0;

@@ -6,7 +6,7 @@
 ;;; match the port's recording run tic for tic, and so must the port's own
 ;;; playback. (Each run is its own process; REC_CASE selects one.)
 (import (chezscheme) (doom d_main) (doom doomdef) (doom doomstat) (doom d_event)
-        (doom i_system) (doom trace))
+        (doom i_system) (doom i_video) (doom trace))
 (load (if (file-exists? "tests/lib.ss") "tests/lib.ss" "../../tests/lib.ss"))
 
 (define compared-fields
@@ -87,6 +87,7 @@
           [else (list 'tic i 'a (car a) 'b (car b))])))
 
 (set! nodrawers #t)
+(set! headless #t)                      ; no audio device either
 (set! i-fake-time #t)
 
 (define (run case) (system (format "REC_CASE=~a scheme --libdirs src --script tests/record.ss" case)))

@@ -66,3 +66,52 @@
      gettimeofday(&tp, &tzp);
      if (!basetime)
  	basetime = tp.tv_sec;
+--- linuxdoom-1.10/i_sound.c
++++ linuxdoom-1.10/i_sound.c
+@@ -40,6 +40,7 @@
+ #include <fcntl.h>
+ #include <unistd.h>
+ #include <sys/ioctl.h>
++#include <errno.h>
+ 
+ // Linux voxware output.
+ #include <linux/soundcard.h>
+@@ -163,7 +164,7 @@
+   int*	arg )
+ {   
+     int		rc;
+-    extern int	errno;
++    // oracle: glibc's errno is thread-local, so no extern int.
+     
+     rc = ioctl(fd, command, arg);  
+     if (rc < 0)
+@@ -665,8 +666,19 @@
+ void
+ I_SubmitSound(void)
+ {
++#ifdef SNDSERV
++  // oracle: SNDSERV still calls this each frame, writing the (all zero)
++  // mixbuffer to fd 0. Instead, tell the lockstep server the frame is
++  // done, so it mixes one buffer.
++  if (sndserver)
++  {
++    fprintf(sndserver, "f\n");
++    fflush(sndserver);
++  }
++#else
+   // Write it to DSP device.
+   write(audio_fd, mixbuffer, SAMPLECOUNT*BUFMUL);
++#endif
+ }
+ 
+ 
+@@ -746,6 +758,9 @@
+ 	    sndserver_filename);
+   else
+     sprintf(buffer, "%s", sndserver_filename);
++  // oracle: ORACLE_SNDSERVER names the (lockstep) sound server to run.
++  if (getenv("ORACLE_SNDSERVER"))
++    sprintf(buffer, "%s", getenv("ORACLE_SNDSERVER"));
+   
+   // start sound process
+   if ( !access(buffer, X_OK) )

@@ -18,7 +18,7 @@
    ;; g_game
    g-build-ticcmd g-responder g-ticker g-init-new g-defered-init-new g-do-load-level
    g-play-demo-bytes g-defered-play-demo g-time-demo g-record-demo g-begin-recording
-   g-check-demo-status g-exit-level g-world-done demobuffer demo-p demorecording-name
+   g-check-demo-status saveg-hook g-save-game g-load-game g-exit-level g-world-done demobuffer demo-p demorecording-name
    timingdemo gamekeydown mousex mousey joyxmove joyymove mousebuttons-set! joybuttons-set!
    ;; m_misc
    m-load-defaults screenblocks detailLevel mouseSensitivity showMessages
@@ -29,7 +29,7 @@
           (doom sounds) (doom dstrings) (doom m_fixed) (doom m_random) (doom m_argv)
           (doom tables) (doom w_wad) (doom v_video) (doom i_system) (doom i_video)
           (doom r_defs) (doom r_data) (doom r_local) (doom p_mobj.h) (doom p_local)
-          (doom am_map) (doom s_sound) (doom m_cheat) (doom d_items) (doom st_lib)
+          (doom am_map) (doom s_sound) (doom i_sound) (doom m_cheat) (doom d_items) (doom st_lib)
           (doom hu_lib) (doom f_wipe))
 
   ;; Globals shared between the included files (define-global makes a
@@ -71,7 +71,10 @@
   (define-global joyxmove 0)
   (define-global joyymove 0)
   (define-global savegameslot 0)
-  (define-global savedescription "")
+  ;; char savedescription[32]: G_SaveGame strcpy's into it and
+  ;; G_DoSaveGame copies all of its first 24 bytes into the savegame, so
+  ;; bytes past the terminator are whatever earlier descriptions left.
+  (define savedescription (make-bytevector 32 0))
   (define-global defdemoname "")
   ;; m_misc.c (m_menu.c's in C)
   (define-global mouseSensitivity 5)
@@ -98,9 +101,11 @@
   (include "f_finale.c.ss")
   (include "d_main.c.ss")
 
-  ;; The playsim and automap call up into the front end through these.
+  ;; The playsim, renderer and automap call up into the front end and the
+  ;; main loop through these.
   (define hooks-installed
     (begin
+      (set! r-net-update net-update)
       (set! st-start-hook st-start)
       (set! hu-start-hook hu-start)
       (set! st-responder-hook st-responder)

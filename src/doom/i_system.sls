@@ -1,7 +1,7 @@
 ;;; i_system: fatal errors, quitting, and timing.
 (library (doom i_system)
   (export i-error &doom-error doom-error? i-quit &doom-quit doom-quit?
-          i-get-time i-fake-time i-wait-vbl)
+          i-get-time i-fake-time i-wait-vbl i-wait-hook)
   (import (chezscheme) (doom global))
 
   ;; I_Error: vanilla prints the message and exits. We raise a condition so
@@ -35,8 +35,13 @@
           (unless basetime (set! basetime ms))
           (quotient (* (- ms basetime) 35) 1000))))
 
-  ;; I_WaitVBL: sleep count 70ths of a second (not under fake time).
+  ;; I_WaitVBL: sleep count 70ths of a second (not under fake time),
+  ;; calling i-wait-hook (if set) every 70th meanwhile: linuxdoom's sound
+  ;; server, a separate process, kept playing while the game slept (the
+  ;; quit sound), and here i_sound keeps the device fed.
+  (define-global i-wait-hook #f)
   (define (i-wait-vbl count)
     (unless i-fake-time
-      (let ([ns (* count (quotient 1000000000 70))])
-        (sleep (make-time 'time-duration (remainder ns 1000000000) (quotient ns 1000000000)))))))
+      (do ([i 0 (fx+ i 1)]) ((fx= i count))
+        (when i-wait-hook (i-wait-hook))
+        (sleep (make-time 'time-duration (quotient 1000000000 70) 0))))))

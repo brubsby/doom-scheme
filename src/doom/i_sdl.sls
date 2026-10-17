@@ -13,7 +13,10 @@
           sdl-get-renderer-output-size
           sdl-create-texture sdl-update-texture
           make-sdl-event sdl-poll-event sdl-event-type sdl-event-key-sym
-          sdl-event-mouse-xrel sdl-event-mouse-yrel sdl-event-mouse-button)
+          sdl-event-mouse-xrel sdl-event-mouse-yrel sdl-event-mouse-button
+          AUDIO_S16LSB sdl-init-sub-system sdl-open-audio-device sdl-close-audio-device
+          sdl-pause-audio-device sdl-queue-audio sdl-get-queued-audio-size
+          sdl-clear-queued-audio)
   (import (chezscheme))
 
   (define lib (load-shared-object "libSDL2-2.0.so.0"))
@@ -64,6 +67,31 @@
     (foreign-procedure "SDL_CreateTexture" (uptr unsigned-32 int int int) uptr))
   (define sdl-update-texture
     (foreign-procedure "SDL_UpdateTexture" (uptr uptr u8* int) int))
+
+  ;; Audio, in queue mode (no callback): the main thread pushes samples.
+  (define AUDIO_S16LSB #x8010)
+  (define sdl-init-sub-system (foreign-procedure "SDL_InitSubSystem" (unsigned-32) int))
+  (define %open-audio-device
+    (foreign-procedure "SDL_OpenAudioDevice" (uptr int u8* u8* int) unsigned-32))
+  ;; Opens the default output device for s16le at freq with the given
+  ;; channel count and buffer size in frames, allowing no changes (SDL
+  ;; converts). Returns the device id, 0 on failure. SDL_AudioSpec: freq
+  ;; (int, 0), format (u16, 4), channels (u8, 6), silence (u8, 7), samples
+  ;; (u16, 8), padding, size (u32, 12), callback (16), userdata (24).
+  (define (sdl-open-audio-device freq nchannels samples)
+    (let ([want (make-bytevector 32 0)] [have (make-bytevector 32 0)])
+      (bytevector-s32-native-set! want 0 freq)
+      (bytevector-u16-native-set! want 4 AUDIO_S16LSB)
+      (bytevector-u8-set! want 6 nchannels)
+      (bytevector-u16-native-set! want 8 samples)
+      (%open-audio-device 0 0 want have 0)))
+  (define sdl-close-audio-device (foreign-procedure "SDL_CloseAudioDevice" (unsigned-32) void))
+  (define sdl-pause-audio-device (foreign-procedure "SDL_PauseAudioDevice" (unsigned-32 int) void))
+  (define %queue-audio (foreign-procedure "SDL_QueueAudio" (unsigned-32 u8* unsigned-32) int))
+  (define (sdl-queue-audio dev bv) (%queue-audio dev bv (bytevector-length bv)))
+  (define sdl-get-queued-audio-size
+    (foreign-procedure "SDL_GetQueuedAudioSize" (unsigned-32) unsigned-32))
+  (define sdl-clear-queued-audio (foreign-procedure "SDL_ClearQueuedAudio" (unsigned-32) void))
 
   ;; SDL_Event is a 56-byte union; we read the few fields we need by offset.
   (define (make-sdl-event) (make-bytevector 56 0))

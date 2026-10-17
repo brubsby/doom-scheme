@@ -9,7 +9,7 @@
 (library (doom r_local)
   (export
    ;; r_main
-   r-init r-set-view-size r-execute-set-view-size r-render-player-view
+   r-init r-set-view-size r-execute-set-view-size r-render-player-view r-net-update
    r-point-in-subsector r-point-to-angle r-point-to-angle2 r-point-to-dist
    r-point-on-side r-point-on-seg-side
    viewangleoffset validcount framecount detailshift setsizeneeded

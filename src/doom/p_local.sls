@@ -31,6 +31,10 @@
    p-damage-mobj p-touch-special-thing p-give-power g-exit-level g-secret-exit-level
    ;; p_pspr
    p-setup-psprites p-move-psprites p-drop-weapon
+   ;; p_saveg
+   savebuffer save_p savemask save-byte! load-byte! p-archive-players p-unarchive-players
+   p-archive-world p-unarchive-world p-archive-thinkers p-unarchive-thinkers
+   p-archive-specials p-unarchive-specials saveg-layouts layout-offsets layout-size
    ;; stand-ins for unported functions
    unported unported-calls unported-first-tic am-stop-hook st-start-hook hu-start-hook
    ;; p_local.h
@@ -124,4 +128,5 @@
   (include "p_inter.c.ss")
   (include "p_pspr.c.ss")
   (include "p_enemy.c.ss")
-  (include "p_setup.c.ss"))
+  (include "p_setup.c.ss")
+  (include "p_saveg.c.ss"))

@@ -149,6 +149,9 @@
     ;; Update display, next frame, with current state.
     (d-display)
     (when d-frame-hook (d-frame-hook))
+    ;; Sound mixing for the buffer is synchronous: under SNDSERV,
+    ;; I_UpdateSound is skipped, and I_SubmitSound runs the server.
+    (i-submit-sound)
     (loop)))
 
 ;; DEMO LOOP
@@ -222,7 +225,11 @@
   (let* ([doomwaddir (or (getenv "DOOMWADDIR")
                          (if (file-exists? "doom1.wad") "." "wads"))]
          [path (lambda (name) (string-append doomwaddir "/" name))]
-         [have (lambda (name) (file-exists? (path name)))])
+         [have (lambda (name) (file-exists? (path name)))]
+         [home (getenv "HOME")])
+    (unless home
+      (i-error "Please set $HOME to your home directory"))
+    (set! basedefault (string-append home "/.doomrc"))
     ;; (-shdev, -regdev and -comdev are id's development setups; not
     ;; supported)
     (cond
@@ -249,7 +256,7 @@
 
 ;; D_DoomMain. (-turbo, -wart, -file, -record, -playdemo, -timedemo,
 ;; -skill, -episode, -warp, -nomonsters, -respawn, -fast, -deathmatch,
-;; -altdeath and -devparm work; -loadgame waits for p_saveg.)
+;; -altdeath, -devparm, -loadgame and -config work.)
 (define (d-doom-main)
   ;; (FindResponseFile: @responsefile is not supported)
   (identify-version)
@@ -343,6 +350,8 @@
   (r-init screenblocks detailLevel)
   (printf "P_Init: Init Playloop state.\n")
   (p-init)
+  (printf "I_Init: Setting up machine state.\n")
+  (i-init-sound)                        ; I_Init
   (printf "D_CheckNetGame: Checking network game status.\n")
   (d-check-net-game)
   (printf "S_Init: Setting up sound.\n")
@@ -385,12 +394,16 @@
       (lambda (c)
         (k (cond
              [(doom-quit? c)
+              (i-shutdown-sound)
+              (i-shutdown-music)
+              (m-save-defaults)
               (i-shutdown-graphics)
               0]
              [(doom-error? c)
               (when demorecording
                 (guard (c2 [#t (void)])
                   (g-check-demo-status)))
+              (i-close-sound)
               (i-shutdown-graphics)
               (display (string-append "Error: " (condition-message c) "\n") (current-error-port))
               255]
