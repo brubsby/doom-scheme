@@ -27,3 +27,11 @@ make test           # Scheme vs. oracle: the renderer, the playsim, and every
                     # finale, saving and loading
 make oracle-traces  # build headless linuxdoom, trace DEMO1-3 into build/oracle/
 ```
+
+## License
+
+GPL version 2 (see [LICENSE](LICENSE)), as the code it ports: id Software's
+DOOM source release and Chocolate Doom (its OPL music player and Nuked OPL3).
+The WADs are not part of the repository: `make wad` fetches id's freely
+redistributable shareware `doom1.wad`, and `make freedoom` fetches Freedoom
+(BSD-licensed).
